@@ -165,14 +165,14 @@ class SqlEngineService {
       );
       if (!tablesResult || tablesResult.length === 0) return [];
 
-      const tableNames = tablesResult[0].values.map((v) => v[0] as string);
+      const tableNames = tablesResult[0].values.map((v: any) => v[0] as string);
       const schemas: TableSchema[] = [];
 
       for (const name of tableNames) {
         const columnsResult = this.db.exec(`PRAGMA table_info("${name}");`);
         const countResult = this.db.exec(`SELECT COUNT(*) FROM "${name}";`);
 
-        const columns: TableColumn[] = columnsResult[0]?.values.map((row) => ({
+        const columns: TableColumn[] = columnsResult[0]?.values.map((row: any) => ({
           cid: row[0] as number,
           name: row[1] as string,
           type: row[2] as string,
