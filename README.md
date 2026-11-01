@@ -200,5 +200,47 @@ npm run build
 
 ---
 
+## 🚀 9. Hosting & Deployment
+
+LUMIO is configured to be deployed as a single full-stack unified service or as separate frontend/backend services.
+
+### Option 1: 1-Click Render Deployment (Recommended - Free Tier with WebSockets)
+
+Render supports WebSockets and will host both the frontend and backend from a single URL using our pre-configured [`render.yaml`](./render.yaml):
+
+1. Go to [Render Dashboard](https://dashboard.render.com).
+2. Click **New +** -> **Blueprint**.
+3. Connect your repository: `anchal2611/lumio-labs`.
+4. Render will read `render.yaml` automatically and configure:
+   - **Build Command**: `npm run install:all && npm run build`
+   - **Start Command**: `npm start`
+5. Click **Apply**. Within 2-3 minutes, your live URL will be active!
+
+### Option 2: Railway.app Deployment
+
+1. Go to [Railway](https://railway.app).
+2. Click **New Project** -> **Deploy from GitHub repo**.
+3. Select `anchal2611/lumio-labs`.
+4. Railway will automatically detect the root `Dockerfile` and provision your application with a public domain.
+
+### Option 3: Docker / Self-Hosted VPS (AWS, DigitalOcean, Hetzner, GCP)
+
+Run the containerized application with a single command:
+```bash
+docker compose up -d --build
+```
+Your instance will be running on port `5000`.
+
+### Option 4: Split Hosting (Vercel Frontend + Render Backend)
+
+- **Frontend on Vercel:** Import `client/` subdirectory. Framework preset: **Vite**. Output: `dist`. Routing rewrites are handled by [`client/vercel.json`](./client/vercel.json).
+  - Set Environment Variables:
+    - `VITE_API_BASE_URL=https://<your-backend-url>/api`
+    - `VITE_SOCKET_URL=https://<your-backend-url>`
+- **Backend on Render/Railway:** Deploy `server/` directory or run `npm start` from root.
+
+---
+
 *Explore. Experiment. Execute.*  
 **LUMIO Engineering Team**
+
