@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Bell,
   Code2,
+  BookOpen,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -25,11 +26,36 @@ import {
   MOCK_ANNOUNCEMENTS,
 } from '../../services/mockData';
 import { useLabStore } from '../../store/useLabStore';
+import { apiGet } from '../../services/api';
+
+interface RealLabItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  language: string;
+  teacher_name?: string;
+  exercises?: any[];
+}
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { savedExperiments, setActiveLab } = useLabStore();
+  const [classLabs, setClassLabs] = useState<RealLabItem[]>([]);
+  const [loadingLabs, setLoadingLabs] = useState(false);
+
+  useEffect(() => {
+    // Fetch assigned labs from student's enrolled classes
+    apiGet<{ labs: RealLabItem[] }>('/labs')
+      .then((data) => {
+        if (data.labs && Array.isArray(data.labs)) {
+          setClassLabs(data.labs);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const activeAssignments = MOCK_ASSIGNMENTS.filter((a) => a.status === 'published');
 
@@ -40,15 +66,16 @@ export const StudentDashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-brand-aqua text-xs font-semibold mb-3">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Semester {user?.semester || 4} • {user?.department}</span>
+            <span>Semester {user?.semester || 4} • {user?.department || 'Computer Science'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Welcome back, {user?.name || 'Student'}!
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Ready to explore? Your compiler sandbox and virtual IoT breadboards are ready. You have{' '}
-            <strong className="text-brand-aqua">{activeAssignments.length} practical assignments</strong>{' '}
-            due this week.
+            Ready to experiment? Your compiler sandbox, interactive SQL console, and virtual IoT breadboards are ready.
+            {classLabs.length > 0 ? (
+              <> You have <strong className="text-brand-aqua">{classLabs.length} assigned classroom lab(s)</strong> waiting.</>
+            ) : null}
           </p>
 
           <div className="mt-5 flex items-center gap-3 flex-wrap">
@@ -57,11 +84,23 @@ export const StudentDashboard: React.FC = () => {
               variant="accent"
               leftIcon={<Play className="w-3.5 h-3.5 fill-white" />}
               onClick={() => {
-                setActiveLab(MOCK_LABS[0]);
-                navigate(`/student/labs/${MOCK_LABS[0].id}`);
+                if (classLabs.length > 0) {
+                  navigate(`/student/labs/${classLabs[0].id}`);
+                } else {
+                  navigate(`/student/labs/lab-python`);
+                }
               }}
             >
-              Resume Python Lab
+              {classLabs.length > 0 ? `Open: ${classLabs[0].title}` : 'Launch Python Lab'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              leftIcon={<BookOpen className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/student/classes')}
+            >
+              My Classes
             </Button>
             <Button
               size="sm"
@@ -70,7 +109,7 @@ export const StudentDashboard: React.FC = () => {
               leftIcon={<Users2 className="w-3.5 h-3.5" />}
               onClick={() => navigate('/student/collaboration')}
             >
-              Join Study Room
+              Study Room
             </Button>
           </div>
         </div>
@@ -83,7 +122,7 @@ export const StudentDashboard: React.FC = () => {
             className="w-16 h-16 rounded-full object-cover ring-2 ring-brand-aqua"
           />
           <h4 className="text-sm font-bold mt-2">{user?.name}</h4>
-          <span className="text-[11px] text-brand-aqua font-mono">{user?.rollNumber}</span>
+          <span className="text-[11px] text-brand-aqua font-mono">{user?.rollNumber || 'LUMIO Scholar'}</span>
           <Badge variant="aqua" size="sm" className="mt-2">
             Active Scholar
           </Badge>
@@ -98,8 +137,8 @@ export const StudentDashboard: React.FC = () => {
               <FlaskConical className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-brand-muted font-medium">Labs Completed</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">8 / 16</h3>
+              <p className="text-[11px] text-brand-muted font-medium">Assigned Class Labs</p>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{classLabs.length} Available</h3>
             </div>
           </CardContent>
         </Card>
@@ -110,8 +149,8 @@ export const StudentDashboard: React.FC = () => {
               <FileCode2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-brand-muted font-medium">Experiments Performed</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">32 Programs</h3>
+              <p className="text-[11px] text-brand-muted font-medium">Virtual Laboratories</p>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{MOCK_LABS.length} Workspaces</h3>
             </div>
           </CardContent>
         </Card>
@@ -123,7 +162,7 @@ export const StudentDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-[11px] text-brand-muted font-medium">Active Collaborations</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">3 Peer Rooms</h3>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">Live Sync Enabled</h3>
             </div>
           </CardContent>
         </Card>
@@ -134,26 +173,87 @@ export const StudentDashboard: React.FC = () => {
               <ClipboardList className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-brand-muted font-medium">Assignments Pending</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{activeAssignments.length} Required</h3>
+              <p className="text-[11px] text-brand-muted font-medium">Coursework & Tasks</p>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{activeAssignments.length} Practicals</h3>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Grid: Left Laboratories & Right Sidebar Feeds */}
+      {/* C. Class Assigned Labs (if any exist in database) */}
+      {classLabs.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900 tracking-tight flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-brand-aqua" />
+                Assigned Classroom Laboratories
+              </h2>
+              <p className="text-xs text-brand-muted">
+                Official laboratory modules assigned by your faculty for coursework and evaluation
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/student/classes')}
+            >
+              View Classes
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classLabs.map((lab) => (
+              <Card
+                key={lab.id}
+                hoverable
+                onClick={() => navigate(`/student/labs/${lab.id}`)}
+                className="border border-primary/20 bg-primary/5 cursor-pointer"
+              >
+                <CardContent className="p-5 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <Badge variant="primary" size="sm" className="capitalize">
+                        {lab.language}
+                      </Badge>
+                      <Badge variant="aqua" size="sm">
+                        Class Lab
+                      </Badge>
+                    </div>
+                    <h3 className="text-base font-bold text-navy-900">{lab.title}</h3>
+                    <p className="text-xs text-brand-muted mt-1 line-clamp-2">{lab.description}</p>
+                    <p className="text-[11px] text-slate-500 mt-3 font-medium">
+                      Instructor: <span className="text-navy-900">{lab.teacher_name || 'Faculty'}</span>
+                    </p>
+                  </div>
+                  <div className="pt-4 mt-4 border-t border-slate-200/60 flex items-center justify-between">
+                    <span className="text-xs text-brand-muted font-medium">
+                      {lab.exercises?.length || 0} Exercises
+                    </span>
+                    <Button size="sm" variant="primary">
+                      Launch Lab →
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Grid: University Laboratories & Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column (2 Cols wide) */}
         <div className="lg:col-span-2 space-y-8">
-          {/* C & D. Explore Laboratories */}
+          {/* University Laboratories */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-bold text-navy-900 tracking-tight">
-                  University Laboratories
+                  University Laboratories & Workspaces
                 </h2>
                 <p className="text-xs text-brand-muted">
-                  Interactive workspaces with guided practicals and blank sandboxes
+                  Interactive workstations with compiler engines, SQL databases, and hardware simulators
                 </p>
               </div>
               <Button
@@ -173,7 +273,7 @@ export const StudentDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* E. Active Collaboration Sessions */}
+          {/* Active Collaboration Sessions */}
           <Card className="border border-slate-200/80">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
@@ -199,89 +299,85 @@ export const StudentDashboard: React.FC = () => {
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-navy-900">{room.title}</h4>
-                      <Badge variant="aqua" size="sm">
-                        {room.roomCode}
+                      <span className="text-xs font-bold text-navy-900">{room.title}</span>
+                      <Badge variant="primary" size="sm" className="uppercase font-mono">
+                        {room.language}
                       </Badge>
                     </div>
-                    <p className="text-[11px] text-brand-muted mt-0.5 line-clamp-1">
-                      {room.description}
+                    <p className="text-[11px] text-brand-muted mt-0.5">
+                      Hosted by {room.hostName} • {room.participants.length} active peer(s)
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {room.participants.length} Active
-                    </span>
-                    <Button size="sm" variant="accent" className="text-xs py-1 px-3">
-                      Enter Room
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="accent">
+                    Enter Session
+                  </Button>
                 </div>
               ))}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column (1 Col wide) */}
+        {/* Right Sidebar Feeds */}
         <div className="space-y-6">
-          {/* F. Upcoming Practical Assignments */}
+          {/* Announcements */}
           <Card className="border border-slate-200/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Upcoming Assignments</CardTitle>
-              <Badge variant="warning" size="sm">
-                Action Required
-              </Badge>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">Department Announcements</CardTitle>
+              <Bell className="w-4 h-4 text-brand-muted" />
             </CardHeader>
             <CardContent className="space-y-3">
-              {activeAssignments.map((asg) => (
-                <div
-                  key={asg.id}
-                  onClick={() => navigate('/student/assignments')}
-                  className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                      {asg.subjectCode}
+              {MOCK_ANNOUNCEMENTS.map((ann) => (
+                <div key={ann.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                      {ann.authorRole}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Due Nov 15
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(ann.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <h4 className="text-xs font-bold text-navy-900 mt-1.5 leading-snug">
-                    {asg.title}
-                  </h4>
-                  <p className="text-[11px] text-brand-muted mt-1">{asg.labName}</p>
+                  <h4 className="text-xs font-bold text-navy-900 mt-1">{ann.title}</h4>
+                  <p className="text-[11px] text-brand-muted mt-1 leading-relaxed">
+                    {ann.content}
+                  </p>
                 </div>
               ))}
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full text-xs"
-                onClick={() => navigate('/student/assignments')}
-              >
-                Go to Assignment Portal
-              </Button>
             </CardContent>
           </Card>
 
-          {/* H. University Announcements */}
-          <Card className="border border-slate-200/80">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-amber-500" />
-                <span>Department Notices</span>
-              </CardTitle>
+          {/* Quick Shortcuts */}
+          <Card className="border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Quick Lab Shortcuts</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {MOCK_ANNOUNCEMENTS.map((anc) => (
-                <div key={anc.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                  <span className="text-[10px] font-bold uppercase text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                    {anc.priority}
-                  </span>
-                  <h4 className="text-xs font-bold text-navy-900 mt-1">{anc.title}</h4>
-                  <p className="text-[11px] text-brand-muted mt-1 leading-relaxed">{anc.content}</p>
-                </div>
-              ))}
+            <CardContent className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-xs font-medium"
+                leftIcon={<Code2 className="w-3.5 h-3.5 text-primary" />}
+                onClick={() => navigate('/student/labs/lab-python')}
+              >
+                Python Algorithms Sandbox
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-xs font-medium"
+                leftIcon={<FileCode2 className="w-3.5 h-3.5 text-teal-600" />}
+                onClick={() => navigate('/student/labs/lab-sql')}
+              >
+                SQL Relational Workbench
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-xs font-medium"
+                leftIcon={<FlaskConical className="w-3.5 h-3.5 text-amber-500" />}
+                onClick={() => navigate('/student/labs/lab-iot')}
+              >
+                ESP32 IoT Breadboard
+              </Button>
             </CardContent>
           </Card>
         </div>

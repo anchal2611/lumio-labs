@@ -1,190 +1,509 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MonacoEditor from '@monaco-editor/react';
-import { ChevronRight, Loader2, ArrowLeft, Lightbulb, CheckCircle2, Play, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import {
+  ChevronRight,
+  Loader2,
+  ArrowLeft,
+  Lightbulb,
+  CheckCircle2,
+  Play,
+  Terminal,
+  RotateCcw,
+  BookOpen,
+  Code2,
+  Sparkles,
+  Download,
+  AlertCircle,
+} from 'lucide-react';
 import { apiGet, apiPost, getToken } from '../../services/api';
 import { config } from '../../config/env';
+import { MOCK_LABS, MOCK_GUIDED_PRACTICALS } from '../../services/mockData';
+import { SqlWorkspace } from '../../components/labs/SqlWorkspace';
+import { CircuitWorkspace } from '../../components/labs/CircuitWorkspace';
+import { GuidedPracticalPanel } from '../../components/labs/GuidedPracticalPanel';
+import { MonacoWorkspace } from '../../components/labs/MonacoWorkspace';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { useToast } from '../../contexts/ToastContext';
 
 interface Exercise {
-  id: string; order: number; title: string; description: string;
-  starterCode: string; expectedOutput: string; hints: string[]; points: number;
+  id: string;
+  order: number;
+  title: string;
+  description: string;
+  starterCode: string;
+  expectedOutput: string;
+  hints: string[];
+  points: number;
 }
-interface LabModule {
-  id: string; title: string; description: string; category: string;
-  difficulty: string; language: string; teacher_name: string;
-  class: { name: string } | null; exercises: Exercise[];
+
+interface DbLabModule {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  language: string;
+  teacher_name?: string;
+  class?: { name: string } | null;
+  exercises: Exercise[];
 }
 
 export const StudentLabDetail: React.FC = () => {
   const { labId } = useParams<{ labId: string }>();
   const navigate = useNavigate();
-  const [lab, setLab] = useState<LabModule | null>(null);
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+
+  // Check if it's one of the built-in university mock labs
+  const mockLab = MOCK_LABS.find((l) => l.id === labId);
+
+  // State for database-backed lab module
+  const [dbLab, setDbLab] = useState<DbLabModule | null>(null);
+  const [loadingDb, setLoadingDb] = useState(Boolean(!mockLab && labId));
   const [activeExIdx, setActiveExIdx] = useState(0);
   const [codes, setCodes] = useState<Record<string, string>>({});
-  const [outputs, setOutputs] = useState<Record<string, string>>({});
+  const [outputs, setOutputs] = useState<Record<string, { stdout: string; stderr: string; timeMs?: number; provider?: string }>>({});
   const [running, setRunning] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [showHints, setShowHints] = useState(false);
 
+  // State for mock guided/workspace lab mode
+  const [guidedMode, setGuidedMode] = useState<'guided' | 'workspace'>('guided');
+  const practicals = mockLab ? MOCK_GUIDED_PRACTICALS[mockLab.id] || [] : [];
+  const currentPractical = practicals[0] || null;
+  const [mockWorkspaceCode, setMockWorkspaceCode] = useState(
+    currentPractical?.starterCode || (mockLab ? `// LUMIO Virtual Lab: ${mockLab.name}\n// Write your code below\n` : '')
+  );
+
   useEffect(() => {
-    apiGet<LabModule>(`/labs/${labId}`)
-      .then((data) => {
-        setLab(data);
-        const initCodes: Record<string, string> = {};
-        data.exercises.forEach(ex => { initCodes[ex.id] = ex.starterCode || ''; });
-        setCodes(initCodes);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [labId]);
-
-  const activeEx = lab?.exercises[activeExIdx];
-
-  const runCode = async () => {
-    if (!activeEx) return;
-    setRunning(activeEx.id);
-    try {
-      const res = await fetch(`${config.apiBaseUrl}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ language: lab?.language || 'python', code: codes[activeEx.id] || activeEx.starterCode }),
-      });
-      const data = await res.json();
-      const out = data.stdout || data.stderr || '[No output]';
-      setOutputs(prev => ({ ...prev, [activeEx.id]: out }));
-
-      // Auto-mark as complete if output matches expected
-      if (activeEx.expectedOutput && out.trim() === activeEx.expectedOutput.trim()) {
-        setCompleted(prev => new Set([...prev, activeEx.id]));
-      }
-    } catch {
-      setOutputs(prev => ({ ...prev, [activeEx.id]: 'Execution failed.' }));
-    } finally {
-      setRunning(null);
+    // If not a predefined mock lab, attempt to fetch from backend
+    if (!mockLab && labId) {
+      setLoadingDb(true);
+      apiGet<DbLabModule>(`/labs/${labId}`)
+        .then((data) => {
+          setDbLab(data);
+          const initCodes: Record<string, string> = {};
+          data.exercises?.forEach((ex) => {
+            initCodes[ex.id] = ex.starterCode || '';
+          });
+          setCodes(initCodes);
+        })
+        .catch(() => {
+          // If not found in DB either, fallback to default python lab
+          const fallback = MOCK_LABS[0];
+          navigate(`/student/labs/${fallback.id}`, { replace: true });
+        })
+        .finally(() => setLoadingDb(false));
     }
-  };
+  }, [labId, mockLab, navigate]);
 
-  const markComplete = (exId: string) => {
-    setCompleted(prev => { const n = new Set(prev); n.has(exId) ? n.delete(exId) : n.add(exId); return n; });
-  };
-
-  if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 text-blue-400 animate-spin" /></div>;
-  if (!lab) return <div className="p-6 text-red-400">Lab not found.</div>;
-
-  const monacoLang = (l: string) => l === 'cpp' ? 'cpp' : l;
-
-  return (
-    <div className="flex h-full overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
-        {/* Header */}
-        <div className="p-4 border-b border-slate-800">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-slate-400 hover:text-white mb-3 text-sm transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-          <h2 className="text-white font-bold text-sm leading-tight">{lab.title}</h2>
-          <p className="text-slate-500 text-xs mt-1 capitalize">{lab.category} • {lab.difficulty} • {lab.language}</p>
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex-1 bg-slate-800 rounded-full h-1.5">
-              <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${(completed.size / lab.exercises.length) * 100}%` }} />
-            </div>
-            <span className="text-xs text-slate-400">{completed.size}/{lab.exercises.length}</span>
-          </div>
-        </div>
-
-        {/* Exercise list */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-          {lab.exercises.map((ex, idx) => (
-            <button
-              key={ex.id}
-              onClick={() => { setActiveExIdx(idx); setShowHints(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${activeExIdx === idx ? 'bg-blue-600/20 border border-blue-500/40 text-blue-300' : 'hover:bg-slate-800 text-slate-400 hover:text-white border border-transparent'}`}
+  // 1. Specialized Engine: SQL Lab
+  if (labId === 'lab-sql') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/student/labs')}
             >
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${completed.has(ex.id) ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                {completed.has(ex.id) ? '✓' : idx + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{ex.title || `Exercise ${idx + 1}`}</p>
-                <p className="text-xs text-slate-500">{ex.points} pts</p>
-              </div>
-              {activeExIdx === idx && <ChevronRight className="w-4 h-4 flex-shrink-0" />}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Area */}
-      {activeEx && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800 flex-shrink-0">
+              Back to Labs
+            </Button>
             <div>
-              <h3 className="text-white font-semibold">{activeEx.title}</h3>
-              <p className="text-slate-500 text-xs">{activeEx.points} points</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {activeEx.hints.length > 0 && (
-                <button onClick={() => setShowHints(!showHints)} className="flex items-center gap-1.5 text-sm text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-all">
-                  <Lightbulb className="w-4 h-4" /> Hints
-                </button>
-              )}
-              <button onClick={() => markComplete(activeEx.id)} className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${completed.has(activeEx.id) ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
-                <CheckCircle2 className="w-4 h-4" /> {completed.has(activeEx.id) ? 'Completed' : 'Mark Done'}
-              </button>
-              <button onClick={runCode} disabled={!!running} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all">
-                {running === activeEx.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                {running === activeEx.id ? 'Running...' : 'Run'}
-              </button>
-            </div>
-          </div>
-
-          {/* Task description */}
-          <div className="px-5 py-3 bg-slate-950/50 border-b border-slate-800 flex-shrink-0">
-            <p className="text-slate-300 text-sm">{activeEx.description}</p>
-            {showHints && activeEx.hints.length > 0 && (
-              <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-                <p className="text-xs font-semibold text-amber-400 mb-2">💡 Hints</p>
-                <ul className="space-y-1">
-                  {activeEx.hints.map((h, i) => <li key={i} className="text-sm text-amber-200/70">• {h}</li>)}
-                </ul>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-navy-900 tracking-tight">Database & SQL Systems Lab</h1>
+                <Badge variant="aqua" size="sm">Interactive Engine</Badge>
               </div>
-            )}
+              <p className="text-xs text-brand-muted mt-0.5">Relational algebra, multi-table joins, and query profiling</p>
+            </div>
+          </div>
+        </div>
+        <SqlWorkspace />
+      </div>
+    );
+  }
+
+  // 2. Specialized Engine: IoT Circuit Lab
+  if (labId === 'lab-iot') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/student/labs')}
+            >
+              Back to Labs
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-navy-900 tracking-tight">IoT & Embedded Systems Breadboard</h1>
+                <Badge variant="primary" size="sm">Hardware Simulator</Badge>
+              </div>
+              <p className="text-xs text-brand-muted mt-0.5">ESP32 microcontroller, sensors, actuators, and serial telemetry</p>
+            </div>
+          </div>
+        </div>
+        <CircuitWorkspace />
+      </div>
+    );
+  }
+
+  // 3. Built-in University Coding Labs (Python, C++, Web, etc.)
+  if (mockLab) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+              onClick={() => navigate('/student/labs')}
+            >
+              Back to Labs
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-navy-900 tracking-tight">{mockLab.name}</h1>
+                <Badge variant="aqua" size="sm">Interactive Lab</Badge>
+              </div>
+              <p className="text-xs text-brand-muted mt-0.5">{mockLab.tagline}</p>
+            </div>
           </div>
 
-          {/* Editor */}
-          <div className="flex-1 overflow-hidden">
-            <MonacoEditor
-              height="100%"
-              language={monacoLang(lab.language)}
-              value={codes[activeEx.id] || activeEx.starterCode}
-              onChange={(val) => setCodes(prev => ({ ...prev, [activeEx.id]: val || '' }))}
-              theme="vs-dark"
-              options={{ fontSize: 14, minimap: { enabled: false }, automaticLayout: true, wordWrap: 'on' }}
+          {currentPractical && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                onClick={() => setGuidedMode('guided')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  guidedMode === 'guided'
+                    ? 'bg-white text-primary shadow-xs'
+                    : 'text-brand-muted hover:text-navy-900'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Guided Practicals</span>
+              </button>
+              <button
+                onClick={() => setGuidedMode('workspace')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  guidedMode === 'workspace'
+                    ? 'bg-white text-navy-900 shadow-xs'
+                    : 'text-brand-muted hover:text-navy-900'
+                }`}
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Open Workspace</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {guidedMode === 'guided' && currentPractical ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[760px]">
+            <div className="lg:col-span-4 h-full">
+              <GuidedPracticalPanel
+                practical={currentPractical}
+                onApplyStarterCode={() => {
+                  setMockWorkspaceCode(currentPractical.starterCode);
+                  toast.info('Starter Code Restored');
+                }}
+              />
+            </div>
+            <div className="lg:col-span-8 h-full">
+              <MonacoWorkspace
+                initialCode={mockWorkspaceCode}
+                language={currentPractical.defaultLanguage}
+                labTitle={mockLab.name}
+                onCodeChange={setMockWorkspaceCode}
+                onSubmitPractical={() => toast.success('Practical Evaluation Submitted!')}
+                isGuidedMode={true}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="h-[760px]">
+            <MonacoWorkspace
+              initialCode={mockWorkspaceCode}
+              language={(mockLab.languages?.[0] as any) || 'python'}
+              labTitle={mockLab.name}
+              onCodeChange={setMockWorkspaceCode}
+              isGuidedMode={false}
             />
           </div>
+        )}
+      </div>
+    );
+  }
 
-          {/* Output */}
-          {outputs[activeEx.id] && (
-            <div className="h-36 bg-slate-950 border-t border-slate-800 p-4 overflow-auto flex-shrink-0">
-              <p className="text-xs text-slate-500 mb-2 font-mono">▶ Output</p>
-              <pre className="text-green-400 font-mono text-sm whitespace-pre-wrap">{outputs[activeEx.id]}</pre>
-              {activeEx.expectedOutput && (
-                <div className="mt-2 pt-2 border-t border-slate-800">
-                  <p className="text-xs text-slate-600">Expected: <span className="font-mono text-slate-500">{activeEx.expectedOutput}</span></p>
+  // 4. Loading state for Database Lab
+  if (loadingDb) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <p className="text-sm text-slate-500 font-medium">Loading virtual laboratory...</p>
+      </div>
+    );
+  }
+
+  // 5. Database-Backed Teacher Lab Module with Dynamic Exercises
+  if (dbLab && dbLab.exercises && dbLab.exercises.length > 0) {
+    const activeEx = dbLab.exercises[activeExIdx] || dbLab.exercises[0];
+    const currentCode = codes[activeEx.id] ?? activeEx.starterCode ?? '';
+    const currentOut = outputs[activeEx.id];
+
+    const runExerciseCode = async () => {
+      setRunning(activeEx.id);
+      try {
+        const res = await fetch(`${config.apiBaseUrl}/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify({
+            language: dbLab.language || 'python',
+            code: currentCode,
+          }),
+        });
+        const data = await res.json();
+        const stdout = data.stdout || '';
+        const stderr = data.stderr || '';
+        setOutputs((prev) => ({
+          ...prev,
+          [activeEx.id]: { stdout, stderr, timeMs: data.timeMs, provider: data.provider },
+        }));
+
+        if (activeEx.expectedOutput && stdout.trim() === activeEx.expectedOutput.trim()) {
+          setCompleted((prev) => new Set([...prev, activeEx.id]));
+          toast.success('Exercise Completed!', 'Your output matches the expected result!');
+        } else if (!stderr && stdout) {
+          toast.info('Execution Complete', `Ran in ${data.timeMs || 25}ms`);
+        }
+      } catch (err: any) {
+        setOutputs((prev) => ({
+          ...prev,
+          [activeEx.id]: { stdout: '', stderr: err?.message || 'Execution request failed' },
+        }));
+        toast.error('Execution Failed');
+      } finally {
+        setRunning(null);
+      }
+    };
+
+    const monacoLang = (l: string) => {
+      const low = (l || '').toLowerCase();
+      if (low.includes('c++') || low === 'cpp') return 'cpp';
+      if (low.includes('python') || low === 'py') return 'python';
+      if (low.includes('sql')) return 'sql';
+      if (low.includes('java')) return 'java';
+      return 'python';
+    };
+
+    return (
+      <div className="flex h-[800px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
+        {/* Left Exercise Navigation */}
+        <div className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+          <div className="p-4 border-b border-slate-800">
+            <button
+              onClick={() => navigate('/student/labs')}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-white mb-3 text-xs transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Labs
+            </button>
+            <h2 className="text-white font-bold text-base leading-snug">{dbLab.title}</h2>
+            <p className="text-slate-400 text-xs mt-1 capitalize">
+              {dbLab.category} • {dbLab.difficulty} • {dbLab.language}
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-brand-aqua h-full rounded-full transition-all duration-300"
+                  style={{ width: `${(completed.size / dbLab.exercises.length) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-400 font-mono font-medium">
+                {completed.size}/{dbLab.exercises.length} Done
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {dbLab.exercises.map((ex, idx) => (
+              <button
+                key={ex.id}
+                onClick={() => {
+                  setActiveExIdx(idx);
+                  setShowHints(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                  activeExIdx === idx
+                    ? 'bg-primary/20 border border-primary/50 text-white'
+                    : 'hover:bg-slate-800/60 text-slate-400 hover:text-white border border-transparent'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    completed.has(ex.id) ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {completed.has(ex.id) ? '✓' : idx + 1}
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate">{ex.title || `Exercise ${idx + 1}`}</p>
+                  <p className="text-[11px] text-slate-500">{ex.points} points</p>
+                </div>
+                {activeExIdx === idx && <ChevronRight className="w-4 h-4 shrink-0 text-brand-aqua" />}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Workspace with Monaco and Terminal Console */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Exercise Bar */}
+          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+            <div>
+              <h3 className="text-white font-bold text-sm">{activeEx.title}</h3>
+              <p className="text-slate-400 text-xs mt-0.5">{activeEx.description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeEx.hints && activeEx.hints.length > 0 && (
+                <button
+                  onClick={() => setShowHints(!showHints)}
+                  className="flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/30 transition-all"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" /> Hints ({activeEx.hints.length})
+                </button>
               )}
+              <button
+                onClick={() => {
+                  setCompleted((prev) => {
+                    const n = new Set(prev);
+                    n.has(activeEx.id) ? n.delete(activeEx.id) : n.add(activeEx.id);
+                    return n;
+                  });
+                }}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border ${
+                  completed.has(activeEx.id)
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {completed.has(activeEx.id) ? 'Completed' : 'Mark Done'}
+              </button>
+              <button
+                onClick={runExerciseCode}
+                disabled={Boolean(running)}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+              >
+                {running === activeEx.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                )}
+                {running === activeEx.id ? 'Running...' : 'Run Code'}
+              </button>
+            </div>
+          </div>
+
+          {/* Hints Banner */}
+          {showHints && activeEx.hints && activeEx.hints.length > 0 && (
+            <div className="px-5 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-200">
+              <span className="font-bold text-amber-300">💡 Hint: </span>
+              {activeEx.hints.join(' • ')}
             </div>
           )}
 
-          {/* Navigate exercises */}
-          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-t border-slate-800 flex-shrink-0">
-            <button disabled={activeExIdx === 0} onClick={() => setActiveExIdx(i => i - 1)} className="text-sm text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">← Previous</button>
-            <span className="text-xs text-slate-500">{activeExIdx + 1} / {lab.exercises.length}</span>
-            <button disabled={activeExIdx === lab.exercises.length - 1} onClick={() => setActiveExIdx(i => i + 1)} className="text-sm text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Next →</button>
+          {/* Monaco Code Editor */}
+          <div className="flex-1 overflow-hidden relative">
+            <MonacoEditor
+              height="100%"
+              language={monacoLang(dbLab.language)}
+              value={currentCode}
+              onChange={(val) => setCodes((prev) => ({ ...prev, [activeEx.id]: val || '' }))}
+              theme="vs-dark"
+              options={{
+                fontSize: 13,
+                minimap: { enabled: false },
+                automaticLayout: true,
+                wordWrap: 'on',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}
+            />
+          </div>
+
+          {/* Always Visible Output Console */}
+          <div className="h-56 bg-slate-950 border-t border-slate-800 flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-4 py-1.5 bg-slate-900 border-b border-slate-800 text-xs">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-3.5 h-3.5 text-brand-aqua" />
+                <span className="font-mono text-slate-300 font-semibold">Console Output</span>
+                {currentOut?.timeMs && (
+                  <span className="text-[10px] text-slate-500 font-mono">({currentOut.timeMs}ms)</span>
+                )}
+                {currentOut?.provider && (
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
+                    {currentOut.provider}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {activeEx.expectedOutput && (
+                  <span className="text-[11px] text-slate-400">
+                    Expected: <span className="font-mono text-slate-200">{activeEx.expectedOutput}</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => setOutputs((prev) => ({ ...prev, [activeEx.id]: { stdout: '', stderr: '' } }))}
+                  className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 p-3 overflow-y-auto font-mono text-xs select-text">
+              {running === activeEx.id ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Executing program in sandbox...</span>
+                </div>
+              ) : currentOut ? (
+                <>
+                  {currentOut.stdout && (
+                    <pre className="text-emerald-400 whitespace-pre-wrap">{currentOut.stdout}</pre>
+                  )}
+                  {currentOut.stderr && (
+                    <pre className="text-rose-400 whitespace-pre-wrap mt-1">{currentOut.stderr}</pre>
+                  )}
+                  {!currentOut.stdout && !currentOut.stderr && (
+                    <p className="text-slate-600">[Program finished with no console output]</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-slate-600 italic">Click "Run Code" above to execute and inspect console output.</p>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // Fallback: Open Workspace
+  return (
+    <div className="h-[760px]">
+      <MonacoWorkspace
+        initialCode={`// LUMIO Virtual Laboratory Workspace\n// Write and execute code in any language\n\nprint("Hello from LUMIO!")\n`}
+        language="python"
+        labTitle="Virtual Sandbox Workspace"
+        isGuidedMode={false}
+      />
     </div>
   );
 };

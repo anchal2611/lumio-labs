@@ -31,7 +31,12 @@ export const TeacherLabs: React.FC = () => {
           </p>
         </div>
 
-        <Button size="sm" variant="accent" leftIcon={<Plus className="w-3.5 h-3.5" />}>
+        <Button
+          size="sm"
+          variant="accent"
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+          onClick={() => navigate('/teacher/labs/new')}
+        >
           Create New Lab Station
         </Button>
       </div>
