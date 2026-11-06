@@ -1,146 +1,137 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { LogIn, Eye, EyeOff, Loader2, FlaskConical, GraduationCap, BookOpen, Shield, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { GraduationCap, BookOpen, ShieldAlert, Sparkles, Mail, Lock } from 'lucide-react';
-import { useToast } from '../../contexts/ToastContext';
-import { UserRole } from '../../types/auth';
+import { LoginFormData } from '../../types/auth';
+
+const DEMO_CREDS = [
+  { label: 'Student', email: 'student@demo.lumio.app', password: 'student123', icon: GraduationCap, color: 'from-violet-500/20 to-violet-600/10 border-violet-500/30 hover:border-violet-400/60' },
+  { label: 'Teacher', email: 'teacher@demo.lumio.app', password: 'teacher123', icon: BookOpen, color: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30 hover:border-cyan-400/60' },
+  { label: 'Admin', email: 'admin@demo.lumio.app', password: 'admin123', icon: Shield, color: 'from-amber-500/20 to-amber-600/10 border-amber-500/30 hover:border-amber-400/60' },
+];
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login, switchDemoRole } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const toast = useToast();
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { register, handleSubmit, setValue, formState: { isSubmitting } } = useForm<LoginFormData>();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-
-    setIsLoading(true);
-    const success = await login(email, password);
-    setIsLoading(false);
-
-    if (success) {
-      toast.success('Welcome back', `Signed in as ${email}`);
-      navigate('/student/dashboard');
+  const onSubmit = async (data: LoginFormData) => {
+    setError(null);
+    try {
+      await login(data);
+      const user = JSON.parse(localStorage.getItem('lumio_auth_user') || '{}');
+      const role = user?.role || 'student';
+      navigate(role === 'admin' ? '/admin/dashboard' : role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true });
+    } catch (e: any) {
+      setError(e.message || 'Login failed. Please check your credentials.');
     }
   };
 
-  const handleDemoLogin = (role: UserRole) => {
-    switchDemoRole(role);
-    toast.success('Demo Mode Active', `Switched to Demo ${role.toUpperCase()} persona.`);
-    if (role === 'student') navigate('/student/dashboard');
-    else if (role === 'teacher') navigate('/teacher/dashboard');
-    else if (role === 'admin') navigate('/admin/dashboard');
+  const fillDemo = (cred: { email: string; password: string }) => {
+    setValue('email', cred.email);
+    setValue('password', cred.password);
   };
 
   return (
-    <div className="min-h-screen bg-brand-canvas flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link to="/" className="inline-flex items-center gap-2.5">
-          <img src="/lumio-logo.svg" alt="LUMIO" className="w-10 h-10 rounded-xl shadow-xs" />
-          <span className="text-2xl font-extrabold text-navy-900 tracking-tight">LUMIO</span>
-        </Link>
-        <h2 className="mt-4 text-xl font-bold text-navy-900">Sign in to your virtual lab</h2>
-        <p className="mt-1 text-xs text-brand-muted">
-          Access your practical experiments, real-time code editor, and assignments
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex items-center justify-center p-4">
+      {/* Background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl shadow-floating border border-slate-200">
-          {/* Quick Demo Personas */}
-          <div className="mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-center">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-navy-900 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-brand-aqua" />
-              <span>Instant 1-Click Demo Login</span>
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 mb-3">
+            <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-500/30">
+              <FlaskConical className="w-7 h-7 text-blue-400" />
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('student')}
-                className="flex flex-col items-center gap-1 p-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-primary rounded-lg text-[11px] font-semibold text-slate-700 transition-all"
-              >
-                <GraduationCap className="w-4 h-4 text-primary" />
-                <span>Student</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('teacher')}
-                className="flex flex-col items-center gap-1 p-2 bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-600 rounded-lg text-[11px] font-semibold text-slate-700 transition-all"
-              >
-                <BookOpen className="w-4 h-4 text-teal-600" />
-                <span>Teacher</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('admin')}
-                className="flex flex-col items-center gap-1 p-2 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-600 rounded-lg text-[11px] font-semibold text-slate-700 transition-all"
-              >
-                <ShieldAlert className="w-4 h-4 text-amber-600" />
-                <span>Admin</span>
-              </button>
-            </div>
+            <span className="text-3xl font-black text-white tracking-tight">LUMIO</span>
           </div>
+          <p className="text-slate-400 text-sm">Virtual Labs. Limitless Learning.</p>
+        </div>
 
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-slate-400">or sign in with university email</span>
-            </div>
-          </div>
+        {/* Card */}
+        <div className="bg-slate-900/70 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+          <h1 className="text-xl font-bold text-white mb-6">Sign in to your account</h1>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="University Email"
-              type="email"
-              placeholder="student@university.edu"
-              leftIcon={<Mail className="w-4 h-4" />}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">{error}</div>
+          )}
 
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-navy-900">Password</label>
-                <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-                  Forgot?
-                </Link>
-              </div>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                leftIcon={<Lock className="w-4 h-4" />}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+              <label className="block text-sm text-slate-400 mb-1.5">Email address</label>
+              <input
+                type="email"
+                autoComplete="email"
+                {...register('email', { required: true })}
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                placeholder="you@example.com"
               />
             </div>
-
-            <Button
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  {...register('password', { required: true })}
+                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+            <button
               type="submit"
-              variant="primary"
-              size="md"
-              className="w-full mt-2"
-              isLoading={isLoading}
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20"
             >
-              Sign In
-            </Button>
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
+            </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-brand-muted">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="font-semibold text-primary hover:underline">
-              Register here
-            </Link>
-          </p>
+          <div className="mt-4 text-center">
+            <Link to="/forgot-password" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Forgot password?</Link>
+          </div>
+
+          {/* Demo Credentials */}
+          <div className="mt-6 pt-6 border-t border-slate-700/50">
+            <p className="text-xs text-slate-500 text-center mb-3">Try Demo Accounts — click to auto-fill</p>
+            <div className="grid grid-cols-3 gap-2">
+              {DEMO_CREDS.map((cred) => {
+                const Icon = cred.icon;
+                return (
+                  <button
+                    key={cred.label}
+                    type="button"
+                    onClick={() => fillDemo(cred)}
+                    className={`bg-gradient-to-b ${cred.color} border rounded-xl p-2.5 text-center transition-all duration-200 group`}
+                  >
+                    <Icon className="w-5 h-5 mx-auto mb-1 text-slate-300 group-hover:text-white transition-colors" />
+                    <span className="text-xs text-slate-400 group-hover:text-white transition-colors font-medium">{cred.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer links */}
+        <div className="mt-6 flex flex-col items-center gap-3 text-sm text-slate-500">
+          <span>Don't have an account? <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium">Register</Link></span>
+          <Link to="/institute/register" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors">
+            <Building2 className="w-4 h-4" />
+            Register Your Institute
+          </Link>
         </div>
       </div>
     </div>

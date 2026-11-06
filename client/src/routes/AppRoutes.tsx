@@ -8,6 +8,7 @@ import { LandingPage } from '../pages/public/LandingPage';
 import { LoginPage } from '../pages/public/LoginPage';
 import { RegisterPage } from '../pages/public/RegisterPage';
 import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage';
+import { InstituteRegisterPage } from '../pages/public/InstituteRegisterPage';
 
 // Student Pages
 import { StudentDashboard } from '../pages/student/StudentDashboard';
@@ -22,6 +23,8 @@ import { StudentResources } from '../pages/student/StudentResources';
 import { StudentNotifications } from '../pages/student/StudentNotifications';
 import { StudentProfile } from '../pages/student/StudentProfile';
 import { StudentSettings } from '../pages/student/StudentSettings';
+import { StudentClasses } from '../pages/student/StudentClasses';
+import { StudentClassDetail } from '../pages/student/StudentClassDetail';
 
 // Teacher Pages
 import { TeacherDashboard } from '../pages/teacher/TeacherDashboard';
@@ -35,6 +38,9 @@ import { TeacherMessages } from '../pages/teacher/TeacherMessages';
 import { TeacherAnalytics } from '../pages/teacher/TeacherAnalytics';
 import { TeacherProfile } from '../pages/teacher/TeacherProfile';
 import { TeacherSettings } from '../pages/teacher/TeacherSettings';
+import { TeacherClasses } from '../pages/teacher/TeacherClasses';
+import { TeacherClassDetail } from '../pages/teacher/TeacherClassDetail';
+import { TeacherLabBuilder } from '../pages/teacher/TeacherLabBuilder';
 
 // Admin Pages
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
@@ -48,6 +54,9 @@ import { AdminSessions } from '../pages/admin/AdminSessions';
 import { AdminReports } from '../pages/admin/AdminReports';
 import { AdminSettings } from '../pages/admin/AdminSettings';
 
+// Collab Hub (shared)
+import { CollabHub } from '../pages/collaboration/CollabHub';
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -56,6 +65,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/institute/register" element={<InstituteRegisterPage />} />
 
       {/* Student Routes */}
       <Route
@@ -65,11 +75,13 @@ export const AppRoutes: React.FC = () => {
             <RoleShell>
               <Routes>
                 <Route path="dashboard" element={<StudentDashboard />} />
+                <Route path="classes" element={<StudentClasses />} />
+                <Route path="classes/:id" element={<StudentClassDetail />} />
                 <Route path="labs" element={<StudentLabsExplore />} />
                 <Route path="labs/:labId" element={<StudentLabDetail />} />
                 <Route path="experiments" element={<StudentExperiments />} />
                 <Route path="assignments" element={<StudentAssignments />} />
-                <Route path="collaboration" element={<StudentCollaboration />} />
+                <Route path="collaboration" element={<CollabHub />} />
                 <Route path="projects" element={<StudentProjects />} />
                 <Route path="messages" element={<StudentMessages />} />
                 <Route path="resources" element={<StudentResources />} />
@@ -91,11 +103,14 @@ export const AppRoutes: React.FC = () => {
             <RoleShell>
               <Routes>
                 <Route path="dashboard" element={<TeacherDashboard />} />
+                <Route path="classes" element={<TeacherClasses />} />
+                <Route path="classes/:id" element={<TeacherClassDetail />} />
                 <Route path="labs" element={<TeacherLabs />} />
+                <Route path="labs/new" element={<TeacherLabBuilder />} />
                 <Route path="practicals" element={<TeacherPracticals />} />
                 <Route path="assignments" element={<TeacherAssignments />} />
                 <Route path="students" element={<TeacherStudents />} />
-                <Route path="collaboration" element={<TeacherCollaboration />} />
+                <Route path="collaboration" element={<CollabHub />} />
                 <Route path="resources" element={<TeacherResources />} />
                 <Route path="messages" element={<TeacherMessages />} />
                 <Route path="analytics" element={<TeacherAnalytics />} />

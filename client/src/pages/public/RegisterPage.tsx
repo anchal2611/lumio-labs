@@ -1,184 +1,177 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { UserPlus, Loader2, FlaskConical, CheckCircle2, Building2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { UserRole } from '../../types/auth';
-import { useToast } from '../../contexts/ToastContext';
-import { GraduationCap, BookOpen } from 'lucide-react';
+import { apiGet } from '../../services/api';
+
+interface RegisterForm {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  role: 'student' | 'teacher';
+  branch?: string;
+  semester?: number;
+  department?: string;
+  designation?: string;
+}
 
 export const RegisterPage: React.FC = () => {
-  const [role, setRole] = useState<UserRole>('student');
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [university, setUniversity] = useState('Apex Institute of Technology');
-  const [department, setDepartment] = useState('Computer Science & Engineering');
-  const [branch, setBranch] = useState('Software Engineering');
-  const [semester, setSemester] = useState(4);
-  const [designation, setDesignation] = useState('Assistant Professor');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { register } = useAuth();
+  const { register: authRegister } = useAuth();
   const navigate = useNavigate();
-  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [domainCheck, setDomainCheck] = useState<{ matched: boolean; institute?: { name: string } } | null>(null);
+  const [checkingDomain, setCheckingDomain] = useState(false);
+  const { register, handleSubmit, watch, setValue, formState: { isSubmitting, errors } } = useForm<RegisterForm>({ defaultValues: { role: 'student' } });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName || !email) return;
+  const watchEmail = watch('email');
+  const watchRole = watch('role');
+  const watchPassword = watch('password');
 
-    setIsLoading(true);
-    const ok = await register({
-      fullName,
-      email,
-      password,
-      role,
-      university,
-      department,
-      branch,
-      semester: role === 'student' ? semester : undefined,
-      designation: role === 'teacher' ? designation : undefined,
-    });
-    setIsLoading(false);
+  // Debounced domain check
+  useEffect(() => {
+    if (!watchEmail || !watchEmail.includes('@')) {
+      setDomainCheck(null);
+      return;
+    }
+    setCheckingDomain(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await apiGet<any>(`/auth/check-domain?email=${encodeURIComponent(watchEmail)}`);
+        setDomainCheck(result);
+        if (result.matched) setValue('role', 'student');
+      } catch { setDomainCheck(null); }
+      finally { setCheckingDomain(false); }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [watchEmail, setValue]);
 
-    if (ok) {
-      toast.success('Registration Successful', `Welcome to LUMIO, ${fullName}!`);
-      navigate(role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard');
+  const onSubmit = async (data: RegisterForm) => {
+    setError(null);
+    if (data.password !== data.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    try {
+      await authRegister({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        role: domainCheck?.matched ? 'student' : data.role,
+        branch: data.branch,
+        semester: data.semester ? Number(data.semester) : undefined,
+        department: data.department,
+        designation: data.designation,
+      });
+      const user = JSON.parse(localStorage.getItem('lumio_auth_user') || '{}');
+      const role = user?.role || 'student';
+      navigate(role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true });
+    } catch (e: any) {
+      setError(e.message || 'Registration failed.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-brand-canvas flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center">
-        <Link to="/" className="inline-flex items-center gap-2.5">
-          <img src="/lumio-logo.svg" alt="LUMIO" className="w-10 h-10 rounded-xl shadow-xs" />
-          <span className="text-2xl font-extrabold text-navy-900 tracking-tight">LUMIO</span>
-        </Link>
-        <h2 className="mt-3 text-xl font-bold text-navy-900">Create your university account</h2>
-        <p className="mt-1 text-xs text-brand-muted">
-          Join your department&apos;s digital virtual laboratory workspace
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex items-center justify-center p-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
       </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-2xl shadow-floating border border-slate-200">
-          {/* Role Selector Tabs */}
-          <div className="grid grid-cols-2 gap-3 mb-6 p-1 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setRole('student')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                role === 'student' ? 'bg-white text-primary shadow-xs' : 'text-slate-600 hover:text-navy-900'
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Student Account</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('teacher')}
-              className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                role === 'teacher' ? 'bg-white text-teal-700 shadow-xs' : 'text-slate-600 hover:text-navy-900'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Faculty Account</span>
-            </button>
+      <div className="relative w-full max-w-lg">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 mb-2">
+            <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-500/30"><FlaskConical className="w-6 h-6 text-blue-400" /></div>
+            <span className="text-2xl font-black text-white tracking-tight">LUMIO</span>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Full Name"
-              placeholder="e.g. Alex Chen"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-
-            <Input
-              label="University Email"
-              type="email"
-              placeholder="name@university.edu"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label="University / Institution"
-                value={university}
-                onChange={(e) => setUniversity(e.target.value)}
-                required
-              />
-
-              <Input
-                label="Department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                required
-              />
+        </div>
+        <div className="bg-slate-900/70 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+          <h1 className="text-xl font-bold text-white mb-6">Create your account</h1>
+          {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">{error}</div>}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Full Name</label>
+              <input {...register('name', { required: true })} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Your full name" />
             </div>
-
-            {role === 'student' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Branch / Major"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  required
-                />
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Email address</label>
+              <div className="relative">
+                <input type="email" {...register('email', { required: true })} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="you@university.edu" />
+                {checkingDomain && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 animate-spin" />}
+              </div>
+              {domainCheck?.matched && (
+                <div className="mt-2 flex items-center gap-2 text-emerald-400 text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Joining <strong>{domainCheck.institute?.name}</strong></span>
+                </div>
+              )}
+            </div>
+            {/* Role selection — only if no institute domain match */}
+            {!domainCheck?.matched && (
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">I am a</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['student', 'teacher'] as const).map((r) => (
+                    <button key={r} type="button" onClick={() => setValue('role', r)}
+                      className={`py-3 rounded-xl border font-medium text-sm capitalize transition-all ${
+                        watchRole === r ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-500'
+                      }`}>{r}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Student fields */}
+            {(domainCheck?.matched || watchRole === 'student') && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-navy-900 mb-1.5">Semester</label>
-                  <select
-                    value={semester}
-                    onChange={(e) => setSemester(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-brand-text focus:outline-none focus:border-primary"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                      <option key={s} value={s}>
-                        Semester {s}
-                      </option>
-                    ))}
+                  <label className="block text-sm text-slate-400 mb-1.5">Branch / Stream</label>
+                  <input {...register('branch')} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="CSE" />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1.5">Semester</label>
+                  <select {...register('semester')} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+                    <option value="">Select</option>
+                    {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
-            ) : (
-              <Input
-                label="Faculty Designation"
-                value={designation}
-                onChange={(e) => setDesignation(e.target.value)}
-                placeholder="e.g. Associate Professor / Lab Director"
-                required
-              />
             )}
-
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              className="w-full mt-4"
-              isLoading={isLoading}
-            >
-              Complete Registration
-            </Button>
+            {/* Teacher fields */}
+            {!domainCheck?.matched && watchRole === 'teacher' && (
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Designation</label>
+                <input {...register('designation')} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Assistant Professor" />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Department</label>
+              <input {...register('department')} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Computer Science" />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Password</label>
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} {...register('password', { required: true, minLength: 6 })} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Min 6 characters" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Confirm Password</label>
+              <input type="password" {...register('confirmPassword', { required: true })} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Re-enter password" />
+            </div>
+            <button type="submit" disabled={isSubmitting} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20">
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+              {isSubmitting ? 'Creating account...' : 'Create Account'}
+            </button>
           </form>
-
-          <p className="mt-6 text-center text-xs text-brand-muted">
-            Already registered?{' '}
-            <Link to="/login" className="font-semibold text-primary hover:underline">
-              Sign In
-            </Link>
-          </p>
+          <p className="mt-6 text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">Sign in</Link></p>
+        </div>
+        <div className="mt-4 text-center">
+          <Link to="/institute/register" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            <Building2 className="w-4 h-4" /> Register Your Institute
+          </Link>
         </div>
       </div>
     </div>

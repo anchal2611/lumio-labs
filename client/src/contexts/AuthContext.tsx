@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UserProfile, UserRole, RegisterFormData } from '../types/auth';
-import { DEMO_USERS } from '../services/mockData';
-import { config } from '../config/env';
+import { UserProfile, UserRole, RegisterFormData, LoginFormData } from '../types/auth';
+import { apiPost, apiGet, setTokens, clearTokens, getToken } from '../services/api';
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -11,110 +10,83 @@ interface AuthContextValue {
   isStudent: boolean;
   isTeacher: boolean;
   isAdmin: boolean;
-  login: (email: string, password?: string) => Promise<boolean>;
-  register: (data: RegisterFormData) => Promise<boolean>;
-  logout: () => void;
-  switchDemoRole: (targetRole: UserRole) => void;
+  login: (data: LoginFormData) => Promise<void>;
+  register: (data: RegisterFormData) => Promise<void>;
+  logout: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const LOCAL_STORAGE_KEY = 'lumio_auth_user';
+const USER_KEY = 'lumio_auth_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Fallback
-    }
-    // Default to student persona for immediate high-fidelity testing
-    return DEMO_USERS.student;
+      const saved = localStorage.getItem(USER_KEY);
+      if (saved && getToken()) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return null;
   });
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(getToken() && !localStorage.getItem(USER_KEY)));
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  // On mount: if token exists but no user, fetch from /api/auth/me
+  useEffect(() => {
+    if (getToken() && !user) {
+      setIsLoading(true);
+      apiGet<UserProfile>('/auth/me')
+        .then((u) => { setUser(u); localStorage.setItem(USER_KEY, JSON.stringify(u)); })
+        .catch(() => { clearTokens(); })
+        .finally(() => setIsLoading(false));
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
     }
   }, [user]);
 
-  const login = useCallback(async (email: string, _password?: string): Promise<boolean> => {
+  const login = useCallback(async (data: LoginFormData): Promise<void> => {
     setIsLoading(true);
-    await new Promise((res) => setTimeout(res, 400));
-
-    // Match demo user email if exists, or generate valid profile
-    const matched = Object.values(DEMO_USERS).find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (matched) {
-      setUser(matched);
+    try {
+      const res: any = await apiPost('/auth/login', data);
+      setTokens(res.token, res.refreshToken);
+      setUser(res.user);
+      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+    } finally {
       setIsLoading(false);
-      return true;
     }
-
-    // Default to student persona if arbitrary email
-    const customUser: UserProfile = {
-      id: `usr_${Date.now()}`,
-      email,
-      name: email.split('@')[0].replace(/[._]/g, ' '),
-      role: 'student',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      university: 'Apex Institute of Technology',
-      department: 'Computer Science & Engineering',
-      branch: 'Software Engineering',
-      semester: 4,
-      joinedAt: new Date().toISOString(),
-      isVerified: true,
-      status: 'active',
-      rollNumber: `CS-${new Date().getFullYear()}-099`,
-    };
-
-    setUser(customUser);
-    setIsLoading(false);
-    return true;
   }, []);
 
-  const register = useCallback(async (data: RegisterFormData): Promise<boolean> => {
+  const register = useCallback(async (data: RegisterFormData): Promise<void> => {
     setIsLoading(true);
-    await new Promise((res) => setTimeout(res, 400));
-
-    const newUser: UserProfile = {
-      id: `usr_${Date.now()}`,
-      email: data.email,
-      name: data.fullName,
-      role: data.role,
-      university: data.university,
-      department: data.department,
-      branch: data.branch,
-      semester: data.semester,
-      designation: data.designation,
-      joinedAt: new Date().toISOString(),
-      isVerified: true,
-      status: 'active',
-      rollNumber: data.role === 'student' ? `CS-${new Date().getFullYear()}-${Math.floor(Math.random() * 800) + 100}` : undefined,
-    };
-
-    setUser(newUser);
-    setIsLoading(false);
-    return true;
-  }, []);
-
-  const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-  }, []);
-
-  const switchDemoRole = useCallback((targetRole: UserRole) => {
-    if (DEMO_USERS[targetRole]) {
-      setUser(DEMO_USERS[targetRole]);
+    try {
+      const res: any = await apiPost('/auth/register', data);
+      setTokens(res.token, res.refreshToken);
+      setUser(res.user);
+      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+    } finally {
+      setIsLoading(false);
     }
+  }, []);
+
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      const refreshToken = localStorage.getItem('lumio_refresh_token');
+      if (refreshToken) await apiPost('/auth/logout', { refreshToken }).catch(() => {});
+    } finally {
+      clearTokens();
+      setUser(null);
+    }
+  }, []);
+
+  const refreshUser = useCallback(async (): Promise<void> => {
+    try {
+      const u = await apiGet<UserProfile>('/auth/me');
+      setUser(u);
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+    } catch { /* ignore */ }
   }, []);
 
   const updateProfile = useCallback((updates: Partial<UserProfile>) => {
@@ -122,28 +94,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const role = user?.role || 'student';
-  const isAuthenticated = Boolean(user);
-  const isStudent = role === 'student';
-  const isTeacher = role === 'teacher';
-  const isAdmin = role === 'admin';
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        role,
-        isAuthenticated,
-        isLoading,
-        isStudent,
-        isTeacher,
-        isAdmin,
-        login,
-        register,
-        logout,
-        switchDemoRole,
-        updateProfile,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      role,
+      isAuthenticated: Boolean(user),
+      isLoading,
+      isStudent: role === 'student',
+      isTeacher: role === 'teacher',
+      isAdmin: role === 'admin',
+      login,
+      register,
+      logout,
+      updateProfile,
+      refreshUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -151,8 +117,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

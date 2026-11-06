@@ -20,6 +20,9 @@ export const DEMO_USERS: Record<string, UserProfile> = {
     joinedAt: '2024-08-15T09:00:00Z',
     isVerified: true,
     status: 'active',
+    instituteId: null,
+    institute: null,
+    createdAt: '2024-08-15T09:00:00Z',
   },
   teacher: {
     id: 'usr_teacher_01',
@@ -33,6 +36,9 @@ export const DEMO_USERS: Record<string, UserProfile> = {
     joinedAt: '2021-06-01T08:30:00Z',
     isVerified: true,
     status: 'active',
+    instituteId: null,
+    institute: null,
+    createdAt: '2021-06-01T08:30:00Z',
   },
   admin: {
     id: 'usr_admin_01',
@@ -46,7 +52,14 @@ export const DEMO_USERS: Record<string, UserProfile> = {
     joinedAt: '2019-01-10T10:00:00Z',
     isVerified: true,
     status: 'active',
+    instituteId: null,
+    institute: null,
+    createdAt: '2019-01-10T10:00:00Z',
   },
+};
+
+const STUB_PROFILE: Pick<UserProfile, 'instituteId' | 'institute' | 'createdAt' | 'status' | 'isVerified'> = {
+  instituteId: null, institute: null, createdAt: '2024-08-15T09:00:00Z', status: 'active', isVerified: true,
 };
 
 export const MOCK_STUDENTS_LIST: UserProfile[] = [
@@ -63,13 +76,12 @@ export const MOCK_STUDENTS_LIST: UserProfile[] = [
     semester: 4,
     rollNumber: 'CS-2024-089',
     joinedAt: '2024-08-15T09:00:00Z',
-    isVerified: true,
-    status: 'active',
+    ...STUB_PROFILE,
   },
   {
     id: 'usr_student_03',
     email: 'liam.oconnor@university.edu',
-    name: 'Liam O\'Connor',
+    name: "Liam O'Connor",
     role: 'student',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
     university: 'Apex Institute of Technology',
@@ -78,8 +90,7 @@ export const MOCK_STUDENTS_LIST: UserProfile[] = [
     semester: 4,
     rollNumber: 'CS-2024-114',
     joinedAt: '2024-08-15T09:00:00Z',
-    isVerified: true,
-    status: 'active',
+    ...STUB_PROFILE,
   },
   {
     id: 'usr_student_04',
@@ -93,10 +104,10 @@ export const MOCK_STUDENTS_LIST: UserProfile[] = [
     semester: 4,
     rollNumber: 'CS-2024-138',
     joinedAt: '2024-08-15T09:00:00Z',
-    isVerified: true,
-    status: 'active',
+    ...STUB_PROFILE,
   },
 ];
+
 
 export const MOCK_LABS: LabItem[] = [
   {

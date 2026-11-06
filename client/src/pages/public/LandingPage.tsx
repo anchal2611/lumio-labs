@@ -26,14 +26,13 @@ import { UserRole } from '../../types/auth';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { switchDemoRole } = useAuth();
+  const { isAuthenticated, role } = useAuth();
 
-  const handleLaunchDemo = (role: UserRole) => {
-    switchDemoRole(role);
-    if (role === 'student') navigate('/student/dashboard');
-    else if (role === 'teacher') navigate('/teacher/dashboard');
-    else if (role === 'admin') navigate('/admin/dashboard');
+  const handleLaunchDemo = (demoRole: UserRole) => {
+    // Navigate to login; demo auto-fill cards are there
+    navigate('/login');
   };
+
 
   return (
     <div className="min-h-screen bg-brand-canvas text-brand-text flex flex-col selection:bg-brand-lightAqua selection:text-navy-900">

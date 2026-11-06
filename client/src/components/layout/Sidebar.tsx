@@ -16,10 +16,11 @@ import {
   BarChart3,
   ShieldCheck,
   Building2,
-  Cpu,
   History,
   Activity,
   FileText,
+  BookOpen,
+  Zap,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -35,11 +36,12 @@ export const Sidebar: React.FC = () => {
 
   const studentLinks: SidebarLink[] = [
     { to: '/student/dashboard', label: 'Overview', icon: LayoutDashboard },
+    { to: '/student/classes', label: 'My Classes', icon: BookOpen },
     { to: '/student/labs', label: 'Explore Labs', icon: FlaskConical },
     { to: '/student/experiments', label: 'My Experiments', icon: FileCode2 },
-    { to: '/student/assignments', label: 'Assignments', icon: ClipboardList, badge: '2' },
+    { to: '/student/assignments', label: 'Assignments', icon: ClipboardList },
+    { to: '/student/collaboration', label: 'Collab Hub', icon: Zap, badge: 'Live' },
     { to: '/student/projects', label: 'My Projects', icon: FolderKanban },
-    { to: '/student/collaboration', label: 'Collaboration', icon: Users2, badge: 'Live' },
     { to: '/student/messages', label: 'Messages', icon: MessageSquare },
     { to: '/student/resources', label: 'Resources', icon: BookMarked },
     { to: '/student/notifications', label: 'Notifications', icon: Bell },
@@ -48,11 +50,12 @@ export const Sidebar: React.FC = () => {
 
   const teacherLinks: SidebarLink[] = [
     { to: '/teacher/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { to: '/teacher/labs', label: 'My Laboratories', icon: FlaskConical },
+    { to: '/teacher/classes', label: 'My Classes', icon: BookOpen },
+    { to: '/teacher/labs', label: 'Lab Modules', icon: FlaskConical },
     { to: '/teacher/practicals', label: 'Practical Mgmt', icon: FileText },
-    { to: '/teacher/assignments', label: 'Assignments', icon: ClipboardList, badge: '38' },
+    { to: '/teacher/assignments', label: 'Assignments', icon: ClipboardList },
     { to: '/teacher/students', label: 'Student Directory', icon: GraduationCap },
-    { to: '/teacher/collaboration', label: 'Faculty Collab', icon: Users2 },
+    { to: '/teacher/collaboration', label: 'Collab Hub', icon: Zap, badge: 'Live' },
     { to: '/teacher/resources', label: 'Shared Resources', icon: BookMarked },
     { to: '/teacher/messages', label: 'Messages', icon: MessageSquare },
     { to: '/teacher/analytics', label: 'Analytics', icon: BarChart3 },
