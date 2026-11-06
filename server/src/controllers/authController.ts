@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
-import db from '../db/database.js';
-import { signToken, signRefreshToken, verifyRefreshToken, AuthRequest, REFRESH_EXPIRES_IN } from '../middleware/auth.js';
+import db from '../db/database';
+import { signToken, signRefreshToken, verifyRefreshToken, AuthRequest, REFRESH_EXPIRES_IN } from '../middleware/auth';
 
 function getInstituteIdByEmailDomain(email: string): string | null {
   const domain = email.split('@')[1]?.toLowerCase();

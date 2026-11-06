@@ -1,27 +1,27 @@
 import { Router } from 'express';
-import { executeCodeHandler } from '../controllers/executionController.js';
-import { verifyToken, requireRole, AuthRequest } from '../middleware/auth.js';
+import { executeCodeHandler } from '../controllers/executionController';
+import { verifyToken, requireRole, AuthRequest } from '../middleware/auth';
 
 // Auth
-import { register, login, logout, refresh, me, checkDomain } from '../controllers/authController.js';
+import { register, login, logout, refresh, me, checkDomain } from '../controllers/authController';
 
 // Institutes
-import { registerInstitute, getMyInstitute, updateDomains, getInstituteUsers } from '../controllers/instituteController.js';
+import { registerInstitute, getMyInstitute, updateDomains, getInstituteUsers } from '../controllers/instituteController';
 
 // Admin
-import { createTeacher, getTeachers, getStudents, updateUserStatus, getStats } from '../controllers/adminController.js';
+import { createTeacher, getTeachers, getStudents, updateUserStatus, getStats } from '../controllers/adminController';
 
 // Classes
-import { createClass, listClasses, joinClass, getClass, getClassStudents, deleteClass, regenerateCode } from '../controllers/classController.js';
+import { createClass, listClasses, joinClass, getClass, getClassStudents, deleteClass, regenerateCode } from '../controllers/classController';
 
 // Labs
-import { createLab, listLabs, getLab, updateLab, deleteLab } from '../controllers/labController.js';
+import { createLab, listLabs, getLab, updateLab, deleteLab } from '../controllers/labController';
 
 // Assignments
-import { createAssignment, listAssignments, submitAssignment, getSubmissions, gradeSubmission } from '../controllers/assignmentController.js';
+import { createAssignment, listAssignments, submitAssignment, getSubmissions, gradeSubmission } from '../controllers/assignmentController';
 
 // Collab
-import { createSession, listSessions, getSession, endSession } from '../controllers/collabController.js';
+import { createSession, listSessions, getSession, endSession } from '../controllers/collabController';
 
 export const apiRouter = Router();
 

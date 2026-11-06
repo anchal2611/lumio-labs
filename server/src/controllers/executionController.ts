@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { config } from '../config/env.js';
+import { config } from '../config/env';
 
 const LANGUAGE_MAP: Record<string, number> = {
   python: 71, // Python (3.8.1)

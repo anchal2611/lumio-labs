@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import db from '../db/database.js';
+import db from '../db/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lumio_jwt_secret_2026_please_change_in_production';
 const JWT_EXPIRES_IN = '7d';

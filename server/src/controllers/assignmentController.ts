@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import db from '../db/database.js';
-import { AuthRequest } from '../middleware/auth.js';
+import db from '../db/database';
+import { AuthRequest } from '../middleware/auth';
 
 // POST /api/assignments
 export function createAssignment(req: AuthRequest, res: Response): void {

@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../middleware/auth.js';
+import { JWT_SECRET } from '../middleware/auth';
 
 interface RoomParticipant {
   socketId: string;

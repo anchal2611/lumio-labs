@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
-import db from './database.js';
+import db from './database';
 
 export async function seedDatabase(): Promise<void> {
   // Check if already seeded

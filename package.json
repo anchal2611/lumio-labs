@@ -4,22 +4,15 @@
   "private": true,
   "description": "LUMIO — Collaborative Virtual Laboratory Platform",
   "scripts": {
-    "install:all": "npm install --include=dev && npm --prefix client install --include=dev && npm --prefix server install --include=dev",
     "dev:client": "npm --prefix client run dev",
     "dev:server": "npm --prefix server run dev",
-    "build:client": "npm --prefix client run build",
-    "build:server": "npm --prefix server run build",
-    "build": "npm run build:client && npm run build:server",
-    "start": "node server/dist/index.js"
+    "build:client": "npm --prefix client install && npm --prefix client run build",
+    "build:server": "npm --prefix server install && npm --prefix server run build",
+    "build": "npm run build:server && npm run build:client",
+    "start": "node server/dist/index.js",
+    "render-build": "npm --prefix server install && npm --prefix server run build && npm --prefix client install && npm --prefix client run build"
   },
-  "keywords": [
-    "virtual-labs",
-    "education",
-    "collaboration",
-    "monaco",
-    "sqlite",
-    "iot-simulation"
-  ],
+  "keywords": ["virtual-labs", "education", "collaboration", "monaco", "sqlite"],
   "author": "LUMIO Engineering Team",
   "license": "ISC"
 }

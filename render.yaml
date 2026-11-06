@@ -1,16 +1,31 @@
 services:
   - type: web
     name: lumio-platform
-    env: node
+    runtime: node
+    region: singapore   # closest to India
     plan: free
-    buildCommand: npm run install:all && npm run build
-    startCommand: npm start
+
+    # Build: install deps + compile TypeScript server + build React client
+    buildCommand: npm run render-build
+
+    # Start: run the compiled server (which also serves client/dist)
+    startCommand: node server/dist/index.js
+
+    # Health check
+    healthCheckPath: /api/health
+
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      - key: CORS_ORIGIN
-        value: '*'
-      - key: LOG_LEVEL
-        value: info
+      - key: JWT_SECRET
+        generateValue: true      # Render auto-generates a secure random value
+      - key: DATA_DIR
+        value: /data             # Persistent disk mount path
+
+    # Persistent disk so the SQLite database survives deploys
+    disk:
+      name: lumio-data
+      mountPath: /data
+      sizeGB: 1
