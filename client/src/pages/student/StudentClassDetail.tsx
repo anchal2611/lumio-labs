@@ -34,7 +34,7 @@ export const StudentClassDetail: React.FC = () => {
   if (!cls) return <div className="p-6 text-red-400">Class not found.</div>;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl">
       <Link to="/student/classes" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Classes
       </Link>

@@ -78,12 +78,12 @@ export const Sidebar: React.FC = () => {
   const links = role === 'teacher' ? teacherLinks : role === 'admin' ? adminLinks : studentLinks;
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
-      <div className="p-4 flex-1">
-        <div className="px-3 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+    <aside className="w-full lg:w-60 bg-white border-b lg:border-b-0 lg:border-r border-slate-200/80 flex flex-col shrink-0 lg:min-h-[calc(100vh-4rem)]">
+      <div className="px-3 py-2 lg:p-4 lg:flex-1 min-w-0">
+        <div className="hidden lg:block px-3 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
           {role === 'teacher' ? 'Faculty Workspace' : role === 'admin' ? 'University Administration' : 'Student Workspace'}
         </div>
-        <nav className="space-y-1">
+        <nav className="flex gap-1 overflow-x-auto lg:overflow-visible lg:block lg:space-y-1 scrollbar-none">
           {links.map((link) => {
             const Icon = link.icon;
             return (
@@ -92,7 +92,7 @@ export const Sidebar: React.FC = () => {
                 to={link.to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all group',
+                    'flex shrink-0 items-center justify-between px-3 py-2 lg:px-3.5 lg:py-2.5 rounded-lg lg:rounded-xl text-xs font-medium transition-all group whitespace-nowrap',
                     isActive
                       ? 'bg-primary/10 text-primary font-semibold shadow-2xs'
                       : 'text-brand-muted hover:text-navy-900 hover:bg-slate-50'
@@ -122,7 +122,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* University Terminal Footer */}
-      <div className="p-4 border-t border-slate-100">
+      <div className="hidden lg:block p-4 border-t border-slate-100">
         <div className="p-3 bg-brand-canvas rounded-xl border border-slate-200/80 text-left">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>

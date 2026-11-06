@@ -41,7 +41,7 @@ export const StudentClasses: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white mb-1">My Classes</h1>
         <p className="text-slate-400">Join classes using the code from your teacher</p>
