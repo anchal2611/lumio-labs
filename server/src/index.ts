@@ -63,7 +63,7 @@ if (clientDistPath) {
 // Initialize database → seed → listen
 async function start() {
   try {
-    initDatabase();
+    await initDatabase();
     await seedDatabase();
   } catch (err) {
     console.error('Database init failed:', err);
