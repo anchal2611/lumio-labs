@@ -48,7 +48,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     // - If institute domain matches → role forced to 'student'
     // - Else use provided role (student/teacher as independent)
     // - Admin role can only be set via institute registration
-    let finalRole = firebaseUser ? 'student' : (role || 'student');
+    let finalRole = firebaseUser ? (role === 'teacher' ? 'teacher' : 'student') : (role || 'student');
     if (instituteId && finalRole === 'admin') finalRole = 'student';
 
     const passwordHash = firebaseUser ? 'firebase-managed' : await bcrypt.hash(password, 10);

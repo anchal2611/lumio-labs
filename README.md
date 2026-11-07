@@ -208,7 +208,7 @@ LUMIO is configured to be deployed as a single full-stack unified service or as 
 
 The client reads Firebase web configuration from `client/.env` locally and `VITE_FIREBASE_*` variables on Render. Enable **Email/Password** under Firebase Authentication > Sign-in method, then deploy the checked-in rules from the repository root with `firebase use lumio-e3c95` and `firebase deploy --only firestore:rules,storage`. Do not put a service-account key in the client or commit it; Render's `FIREBASE_SERVICE_ACCOUNT_JSON` is reserved for backend Admin SDK operations.
 
-Firebase Auth is wired for new student signups and login. The app still uses its existing SQLite database as the source for classes, labs, assignments, and collaboration; those collections have not yet been migrated to Firestore, and existing accounts need an explicit Auth import before Firebase login can replace their current credentials. Keep the existing backend data volume until that migration and reconciliation are completed.
+Firebase Auth is wired for new student and teacher signups and login. The app still uses its existing SQLite database as the source for classes, labs, assignments, and collaboration; those collections have not yet been migrated to Firestore, and existing accounts need an explicit Auth import before Firebase login can replace their current credentials. Render Free uses ephemeral local storage: SQLite data can reset after restarts, deploys, or spin-downs. Don't store production records there until the app data has been migrated to Firestore or another persistent database.
 
 ### Option 1: 1-Click Render Deployment (Recommended - Free Tier with WebSockets)
 
