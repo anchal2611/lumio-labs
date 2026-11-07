@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { executeCodeHandler } from '../controllers/executionController';
-import { verifyToken, requireRole, AuthRequest } from '../middleware/auth';
+import { verifyToken, verifyFirebaseTokenWhenPresent, requireRole, AuthRequest } from '../middleware/auth';
 
 // Auth
 import { register, login, logout, refresh, me, checkDomain } from '../controllers/authController';
@@ -31,10 +31,10 @@ apiRouter.get('/health', (_req, res) => {
 });
 
 // ─── Code Execution ──────────────────────────────────
-apiRouter.post('/execute', executeCodeHandler);
+apiRouter.post('/execute', verifyToken, requireRole(['student', 'teacher']), executeCodeHandler as any);
 
 // ─── Auth ─────────────────────────────────────────────
-apiRouter.post('/auth/register', register);
+apiRouter.post('/auth/register', verifyFirebaseTokenWhenPresent, register as any);
 apiRouter.post('/auth/login', login);
 apiRouter.post('/auth/logout', verifyToken, logout as any);
 apiRouter.post('/auth/refresh', refresh);

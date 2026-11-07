@@ -11,5 +11,11 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - CORS_ORIGIN=*
+      - DATA_DIR=/data
+      - JWT_SECRET=${JWT_SECRET:?Set a unique JWT_SECRET of at least 32 characters}
+    volumes:
+      - lumio_data:/data
     restart: unless-stopped
+
+volumes:
+  lumio_data:

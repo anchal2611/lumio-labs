@@ -204,6 +204,12 @@ npm run build
 
 LUMIO is configured to be deployed as a single full-stack unified service or as separate frontend/backend services.
 
+### Firebase bootstrap (Auth, Firestore, Storage)
+
+The client reads Firebase web configuration from `client/.env` locally and `VITE_FIREBASE_*` variables on Render. Enable **Email/Password** under Firebase Authentication > Sign-in method, then deploy the checked-in rules from the repository root with `firebase use lumio-e3c95` and `firebase deploy --only firestore:rules,storage`. Do not put a service-account key in the client or commit it; Render's `FIREBASE_SERVICE_ACCOUNT_JSON` is reserved for backend Admin SDK operations.
+
+Firebase Auth is wired for new student signups and login. The app still uses its existing SQLite database as the source for classes, labs, assignments, and collaboration; those collections have not yet been migrated to Firestore, and existing accounts need an explicit Auth import before Firebase login can replace their current credentials. Keep the existing backend data volume until that migration and reconciliation are completed.
+
 ### Option 1: 1-Click Render Deployment (Recommended - Free Tier with WebSockets)
 
 Render supports WebSockets and will host both the frontend and backend from a single URL using our pre-configured [`render.yaml`](./render.yaml):
@@ -212,9 +218,17 @@ Render supports WebSockets and will host both the frontend and backend from a si
 2. Click **New +** -> **Blueprint**.
 3. Connect your repository: `anchal2611/lumio-labs`.
 4. Render will read `render.yaml` automatically and configure:
-   - **Build Command**: `npm run install:all && npm run build`
-   - **Start Command**: `npm start`
+   - **Build Command**: `npm run render-build` (installs from lockfiles and builds both apps)
+   - **Start Command**: `node server/dist/index.js`
+   - A persistent `/data` disk for the SQLite database
 5. Click **Apply**. Within 2-3 minutes, your live URL will be active!
+
+Production requirements:
+
+- Set `JWT_SECRET` to a unique random value of at least 32 characters. Render generates this value from `render.yaml`.
+- Set `JUDGE0_API_KEY` and `JUDGE0_API_URL` to enable remote code execution. Production never runs student code inside the web server; without Judge0 configured, execution returns an unavailable response.
+- Demo accounts and seed data are disabled in production. Set `SEED_DEMO_DATA=true` only for an isolated demo deployment.
+- For a separately hosted frontend, set `CORS_ORIGIN` on the backend to the exact frontend origin. Same-origin Render deployments need no CORS override.
 
 ### Option 2: Railway.app Deployment
 
@@ -227,9 +241,9 @@ Render supports WebSockets and will host both the frontend and backend from a si
 
 Run the containerized application with a single command:
 ```bash
-docker compose up -d --build
+JWT_SECRET="$(openssl rand -base64 48)" docker compose up -d --build
 ```
-Your instance will be running on port `5000`.
+Docker Compose stores the database in a named persistent volume. The app listens on port `5000`.
 
 ### Option 4: Split Hosting (Vercel Frontend + Render Backend)
 
@@ -238,6 +252,7 @@ Your instance will be running on port `5000`.
     - `VITE_API_BASE_URL=https://<your-backend-url>/api`
     - `VITE_SOCKET_URL=https://<your-backend-url>`
 - **Backend on Render/Railway:** Deploy `server/` directory or run `npm start` from root.
+  - Set `CORS_ORIGIN` to the exact Vercel origin and configure `JWT_SECRET` plus Judge0 credentials.
 
 ---
 

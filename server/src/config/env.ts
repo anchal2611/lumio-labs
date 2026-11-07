@@ -2,6 +2,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
+  nodeEnv: process.env.NODE_ENV || 'development',
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID || 'lumio-e3c95',
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
+  },
   port: parseInt(process.env.PORT || '5000', 10),
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   sessionSecret: process.env.SESSION_SECRET || 'lumio_secret_key_2026',

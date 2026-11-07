@@ -57,8 +57,9 @@ export const CollabEditorRoom: React.FC<CollabEditorRoomProps> = ({ room }) => {
     setIsExecuting(true);
     try {
       const res = await executeCode(room.language, room.code);
-      setStdout(res.stdout || res.stderr);
-      toast.success('Collaborative Execution', `Completed in ${res.timeMs}ms`);
+      setStdout(res.stdout || res.stderr || 'Program finished without output.');
+      if (res.status === 'success') toast.success('Collaborative Execution', `Completed in ${res.timeMs}ms`);
+      else toast.error('Execution Error', res.stderr || `Program exited with code ${res.exitCode}.`);
     } catch {
       toast.error('Execution Error');
     } finally {

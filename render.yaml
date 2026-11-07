@@ -15,6 +15,8 @@ services:
     healthCheckPath: /api/health
 
     envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
       - key: NODE_ENV
         value: production
       - key: PORT
@@ -23,6 +25,24 @@ services:
         generateValue: true      # Render auto-generates a secure random value
       - key: DATA_DIR
         value: /data             # Persistent disk mount path
+      - key: FIREBASE_PROJECT_ID
+        value: lumio-e3c95
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: lumio-e3c95
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        value: "959607549702"
+      - key: VITE_FIREBASE_APP_ID
+        value: "1:959607549702:web:1b04cbaad8f58ee3483887"
+      - key: VITE_FIREBASE_MEASUREMENT_ID
+        value: G-2NP3J5WCK8
 
     # Persistent disk so the SQLite database survives deploys
     disk:

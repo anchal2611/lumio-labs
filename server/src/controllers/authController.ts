@@ -24,9 +24,14 @@ function getInstituteIdByEmailDomain(email: string): string | null {
 export async function register(req: Request, res: Response): Promise<void> {
   try {
     const { name, email, password, role, branch, semester, department, designation, employeeId, rollNumber } = req.body;
+    const firebaseUser = (req as AuthRequest).firebaseUser;
 
-    if (!name || !email || !password) {
-      res.status(400).json({ error: 'Name, email and password are required.' });
+    if (!name || !email || (!password && !firebaseUser)) {
+      res.status(400).json({ error: 'Name and email are required.' });
+      return;
+    }
+    if (firebaseUser && firebaseUser.email.toLowerCase() !== String(email).toLowerCase()) {
+      res.status(403).json({ error: 'Firebase account email does not match registration email.' });
       return;
     }
 
@@ -43,11 +48,11 @@ export async function register(req: Request, res: Response): Promise<void> {
     // - If institute domain matches → role forced to 'student'
     // - Else use provided role (student/teacher as independent)
     // - Admin role can only be set via institute registration
-    let finalRole = role || 'student';
+    let finalRole = firebaseUser ? 'student' : (role || 'student');
     if (instituteId && finalRole === 'admin') finalRole = 'student';
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const userId = uuid();
+    const passwordHash = firebaseUser ? 'firebase-managed' : await bcrypt.hash(password, 10);
+    const userId = firebaseUser?.uid || uuid();
 
     db.prepare(`
       INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
@@ -74,7 +79,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       : null;
 
     const payload = { userId, email: email.toLowerCase(), role: finalRole, instituteId };
-    const token = signToken(payload);
+    const token = firebaseUser ? null : signToken(payload);
     const refreshToken = signRefreshToken(payload);
 
     // Store refresh token hash
@@ -85,7 +90,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     `).run(uuid(), userId, tokenHash, new Date(Date.now() + REFRESH_EXPIRES_IN).toISOString());
 
     res.status(201).json({
-      token,
+      ...(token ? { token } : {}),
       refreshToken,
       user: {
         id: user.id,
@@ -115,6 +120,11 @@ export async function login(req: Request, res: Response): Promise<void> {
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase()) as any;
     if (!user) {
       res.status(401).json({ error: 'Invalid email or password.' });
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_DATA !== 'true' && user.email.endsWith('@demo.lumio.app')) {
+      res.status(401).json({ error: 'Demo accounts are disabled in production.' });
       return;
     }
 

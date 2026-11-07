@@ -81,13 +81,22 @@ function runProcess(
 export async function executeCodeHandler(req: Request, res: Response): Promise<void> {
   const { language, code, stdin = '' } = req.body;
 
-  if (!language || !code) {
+  if (typeof language !== 'string' || typeof code !== 'string' || !code.trim()) {
     res.status(400).json({ error: 'Language and code are required.' });
     return;
   }
 
+  if (code.length > 100_000 || typeof stdin !== 'string' || stdin.length > 20_000) {
+    res.status(413).json({ error: 'Code or standard input exceeds the allowed size.' });
+    return;
+  }
+
   const lang = (language || '').toLowerCase().trim();
-  const langId = LANGUAGE_MAP[lang] || 71;
+  const langId = LANGUAGE_MAP[lang];
+  if (!langId) {
+    res.status(400).json({ error: 'Unsupported language.' });
+    return;
+  }
 
   // 1. If Judge0 API is explicitly configured with a key, try it first
   if (config.judge0.apiKey) {
@@ -121,8 +130,15 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
         return;
       }
     } catch (err: any) {
-      console.warn('Judge0 failed, falling back to local runtime engine:', err?.message);
+      console.warn('Judge0 execution request failed:', err?.message);
     }
+  }
+
+  // Never execute submitted source code inside the web server process in
+  // production. Local runtimes below are for development only.
+  if (config.nodeEnv === 'production') {
+    res.status(503).json({ error: 'Code execution is temporarily unavailable. Configure the Judge0 provider.' });
+    return;
   }
 
   // 2. Real Local Execution Engine (Python & Node.js)

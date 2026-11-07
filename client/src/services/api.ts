@@ -1,11 +1,15 @@
 // Central API service with JWT token handling and auto-refresh
 import { config } from '../config/env';
+import { firebaseAuth } from './firebase';
 
 const TOKEN_KEY = 'lumio_token';
 const REFRESH_TOKEN_KEY = 'lumio_refresh_token';
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
+}
+export async function getAuthToken(): Promise<string | null> {
+  return firebaseAuth?.currentUser ? firebaseAuth.currentUser.getIdToken() : getToken();
 }
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
@@ -39,7 +43,7 @@ async function tryRefresh(): Promise<string | null> {
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  let token = getToken();
+  let token = await getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -49,7 +53,11 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   let res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
 
   // Auto-refresh on 401
-  if (res.status === 401 && getRefreshToken()) {
+  if (res.status === 401 && firebaseAuth?.currentUser) {
+    token = await firebaseAuth.currentUser.getIdToken(true);
+    headers['Authorization'] = `Bearer ${token}`;
+    res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
+  } else if (res.status === 401 && getRefreshToken()) {
     token = await tryRefresh();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole, RegisterFormData, LoginFormData } from '../types/auth';
 import { apiPost, apiGet, setTokens, clearTokens, getToken } from '../services/api';
+import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { firebaseAuth, saveFirebaseUserProfile } from '../services/firebase';
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -28,10 +30,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch { /* ignore */ }
     return null;
   });
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(getToken() && !localStorage.getItem(USER_KEY)));
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(firebaseAuth || (getToken() && !localStorage.getItem(USER_KEY))));
 
   // On mount: if token exists but no user, fetch from /api/auth/me
   useEffect(() => {
+    if (firebaseAuth) {
+      return onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+        if (!firebaseUser) { setUser(null); setIsLoading(false); return; }
+        try {
+          const profile = await apiGet<UserProfile>('/auth/me');
+          setUser(profile);
+          localStorage.setItem(USER_KEY, JSON.stringify(profile));
+        } catch { setUser(null); }
+        finally { setIsLoading(false); }
+      });
+    }
     if (getToken() && !user) {
       setIsLoading(true);
       apiGet<UserProfile>('/auth/me')
@@ -50,6 +63,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (data: LoginFormData): Promise<void> => {
     setIsLoading(true);
     try {
+      if (firebaseAuth) {
+        await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+        const profile = await apiGet<UserProfile>('/auth/me');
+        setUser(profile);
+        localStorage.setItem(USER_KEY, JSON.stringify(profile));
+        return;
+      }
       const res: any = await apiPost('/auth/login', data);
       setTokens(res.token, res.refreshToken);
       setUser(res.user);
@@ -62,6 +82,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = useCallback(async (data: RegisterFormData): Promise<void> => {
     setIsLoading(true);
     try {
+      if (firebaseAuth) {
+        const credential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+        await saveFirebaseUserProfile({ uid: credential.user.uid, name: data.name, email: data.email });
+        const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data, password: undefined });
+        const profile = result.user;
+        setUser(profile);
+        localStorage.setItem(USER_KEY, JSON.stringify(profile));
+        return;
+      }
       const res: any = await apiPost('/auth/register', data);
       setTokens(res.token, res.refreshToken);
       setUser(res.user);
@@ -76,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const refreshToken = localStorage.getItem('lumio_refresh_token');
       if (refreshToken) await apiPost('/auth/logout', { refreshToken }).catch(() => {});
     } finally {
+      if (firebaseAuth) await signOut(firebaseAuth);
       clearTokens();
       setUser(null);
     }

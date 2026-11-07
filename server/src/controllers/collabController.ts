@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
+import { notifySessionEnded } from '../sockets/collabSocket';
 
 // POST /api/collab/sessions
 export function createSession(req: AuthRequest, res: Response): void {
@@ -99,5 +100,6 @@ export function endSession(req: AuthRequest, res: Response): void {
     return;
   }
   db.prepare('UPDATE collab_sessions SET is_active = 0 WHERE id = ?').run(id);
+  notifySessionEnded(id);
   res.json({ message: 'Session ended.' });
 }

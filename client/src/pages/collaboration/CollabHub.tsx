@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import MonacoEditor from '@monaco-editor/react';
-import { Users, MessageSquare, Play, Plus, X, Send, Loader2, Zap, FlaskConical, GraduationCap, BookOpen, Wifi, WifiOff, ChevronDown } from 'lucide-react';
-import { apiGet, apiPost, getToken } from '../../services/api';
+import { Users, MessageSquare, Play, Plus, X, Send, Loader2, Zap, FlaskConical, GraduationCap, BookOpen, Wifi, WifiOff, Square } from 'lucide-react';
+import { apiDelete, apiGet, apiPost, getAuthToken } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { config } from '../../config/env';
 
 const LANGS = ['python', 'javascript', 'cpp', 'java', 'sql'];
 
-interface Session { id: string; name: string; type: string; host_name: string; host_role: string; language: string; initial_code: string; }
+interface Session { id: string; name: string; type: string; host_id: string; host_name: string; host_role: string; language: string; initial_code: string; }
 interface Participant { userId?: string; userName: string; userRole?: string; socketId?: string; }
 interface ChatMessage { id: string; senderName: string; text: string; timestamp: string; }
 
@@ -37,6 +37,7 @@ export const CollabHub: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,26 +51,54 @@ export const CollabHub: React.FC = () => {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chat]);
+  useEffect(() => () => { socketRef.current?.disconnect(); }, []);
 
-  const connectToSession = (session: Session) => {
-    setActiveSession(session);
-    setCode(session.initial_code || '');
-    setParticipants([]); setChat([]);
-    const token = getToken();
-    const socket = io(config.socketUrl, { auth: { token }, transports: ['websocket', 'polling'] });
-    socketRef.current = socket;
-    socket.on('connect', () => { setConnected(true); socket.emit('join_room', { roomId: session.id, user: { id: user?.id, name: user?.name, role: user?.role } }); });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('code_updated', ({ code: c }: any) => setCode(c));
-    socket.on('room_participants_updated', (p: Participant[]) => setParticipants(p));
-    socket.on('chat_received', (msg: ChatMessage) => setChat(prev => [...prev, msg]));
-    socket.on('output_shared', ({ output: o, senderName }: any) => { setOutput(o); setChat(prev => [...prev, { id: Date.now().toString(), senderName, text: `Shared output: ${o.slice(0, 80)}`, timestamp: new Date().toISOString() }]); });
+  const addChatMessage = (message: ChatMessage) => {
+    setChat((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
   };
 
   const disconnectSession = () => {
     socketRef.current?.disconnect();
     socketRef.current = null;
-    setActiveSession(null); setConnected(false); setParticipants([]); setChat([]);
+    setActiveSession(null); setConnected(false); setParticipants([]); setChat([]); setChatInput('');
+  };
+
+  const connectToSession = async (session: Session) => {
+    socketRef.current?.disconnect();
+    setActiveSession(session);
+    setCode(session.initial_code || '');
+    setParticipants([]); setChat([]); setChatInput(''); setOutput(''); setConnected(false);
+    const token = await getAuthToken();
+    if (!token) { setOutput('Sign in again to join this session.'); return; }
+    const socket = io(config.socketUrl, { auth: { token }, transports: ['websocket', 'polling'] });
+    socketRef.current = socket;
+    socket.on('connect', () => { setConnected(true); socket.emit('join_room', { roomId: session.id }); });
+    socket.on('disconnect', () => setConnected(false));
+    socket.on('connect_error', (err) => { setConnected(false); setOutput(err.message || 'Could not connect to this session.'); });
+    socket.on('room_error', ({ error }: { error: string }) => { setOutput(error || 'Could not join this session.'); setConnected(false); });
+    socket.on('code_updated', ({ code: c }: any) => setCode(c));
+    socket.on('room_participants_updated', (p: Participant[]) => setParticipants(p));
+    socket.on('chat_received', (msg: ChatMessage) => addChatMessage(msg));
+    socket.on('output_shared', ({ output: o, senderName }: any) => { setOutput(o); addChatMessage({ id: `output-${Date.now()}`, senderName, text: `Shared output: ${String(o).slice(0, 80)}`, timestamp: new Date().toISOString() }); });
+    socket.on('session_ended', () => {
+      setOutput('The host ended this session.');
+      disconnectSession();
+      void fetchSessions();
+    });
+  };
+
+  const endSession = async () => {
+    if (!activeSession || activeSession.host_id !== user?.id) return;
+    setEnding(true);
+    try {
+      await apiDelete(`/collab/sessions/${activeSession.id}`);
+      disconnectSession();
+      await fetchSessions();
+    } catch (err) {
+      setOutput(err instanceof Error ? `Could not end session: ${err.message}` : 'Could not end session.');
+    } finally {
+      setEnding(false);
+    }
   };
 
   const handleCodeChange = (val: string | undefined) => {
@@ -80,9 +109,9 @@ export const CollabHub: React.FC = () => {
 
   const sendChat = () => {
     if (!chatInput.trim()) return;
-    const msg: ChatMessage = { id: Date.now().toString(), senderName: user?.name || 'You', text: chatInput, timestamp: new Date().toISOString() };
+    const msg: ChatMessage = { id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`, senderName: user?.name || 'You', text: chatInput.trim(), timestamp: new Date().toISOString() };
     socketRef.current?.emit('send_chat', { roomId: activeSession?.id, message: msg });
-    setChat(prev => [...prev, msg]);
+    addChatMessage(msg);
     setChatInput('');
   };
 
@@ -90,12 +119,11 @@ export const CollabHub: React.FC = () => {
     if (!code.trim()) return;
     setRunning(true);
     try {
-      const res = await fetch(`${config.apiBaseUrl}/execute`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` }, body: JSON.stringify({ language: activeSession?.language || 'python', code }) });
-      const data = await res.json();
-      const out = data.stdout || data.stderr || '[No output]';
+      const data = await apiPost<{ stdout?: string; stderr?: string; exitCode?: number }>('/execute', { language: activeSession?.language || 'python', code });
+      const out = data.stdout || data.stderr || `Program finished without output (exit code ${data.exitCode ?? 0}).`;
       setOutput(out);
       socketRef.current?.emit('share_output', { roomId: activeSession?.id, output: out });
-    } catch { setOutput('Execution failed.'); }
+    } catch (err) { setOutput(err instanceof Error ? err.message : 'Execution failed.'); }
     finally { setRunning(false); }
   };
 
@@ -118,7 +146,7 @@ export const CollabHub: React.FC = () => {
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <button onClick={disconnectSession} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            <button onClick={disconnectSession} title="Leave session" className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
             <span className="text-white font-semibold">{activeSession.name}</span>
@@ -139,6 +167,12 @@ export const CollabHub: React.FC = () => {
             <button onClick={runCode} disabled={running} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Run
             </button>
+            {activeSession.host_id === user?.id && (
+              <button onClick={endSession} disabled={ending} className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                {ending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-3.5 h-3.5 fill-current" />}
+                {ending ? 'Ending…' : 'End session'}
+              </button>
+            )}
             <button onClick={() => setShowChat(!showChat)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <MessageSquare className="w-4 h-4" />
             </button>

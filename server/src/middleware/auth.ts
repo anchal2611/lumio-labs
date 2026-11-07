@@ -1,8 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import db from '../db/database';
+import { firebaseAdminAuth } from '../config/firebaseAdmin';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'lumio_jwt_secret_2026_please_change_in_production';
+const configuredJwtSecret = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === 'production' && (!configuredJwtSecret || configuredJwtSecret.length < 32)) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters in production.');
+}
+const JWT_SECRET = configuredJwtSecret || 'lumio_jwt_secret_2026_please_change_in_production';
 const JWT_EXPIRES_IN = '7d';
 const REFRESH_EXPIRES_IN = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
 
@@ -15,6 +20,7 @@ export interface JwtPayload {
 
 export interface AuthRequest extends Request {
   user?: JwtPayload;
+  firebaseUser?: { uid: string; email: string; emailVerified: boolean };
 }
 
 export function signToken(payload: JwtPayload): string {
@@ -33,6 +39,17 @@ export function verifyRefreshToken(token: string): JwtPayload | null {
   }
 }
 
+function attachDatabaseUser(req: AuthRequest, res: Response, next: NextFunction, userId: string): boolean {
+  const user = db.prepare('SELECT id, email, role, institute_id, status FROM users WHERE id = ?').get(userId) as any;
+  if (!user || user.status !== 'active') {
+    res.status(user ? 403 : 401).json({ error: user ? 'Account is inactive.' : 'Account profile not found.' });
+    return false;
+  }
+  req.user = { userId: user.id, email: user.email, role: user.role, instituteId: user.institute_id };
+  next();
+  return true;
+}
+
 export function verifyToken(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -43,11 +60,38 @@ export function verifyToken(req: AuthRequest, res: Response, next: NextFunction)
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    req.user = decoded;
-    next();
+    attachDatabaseUser(req, res, next, decoded.userId);
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    void firebaseAdminAuth.verifyIdToken(token)
+      .then((decoded) => attachDatabaseUser(req, res, next, decoded.uid))
+      .catch(() => res.status(401).json({ error: 'Invalid or expired token' }));
   }
+}
+
+export function verifyFirebaseToken(req: AuthRequest, res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Firebase ID token required.' });
+    return;
+  }
+  void firebaseAdminAuth.verifyIdToken(authHeader.slice(7))
+    .then((decoded) => {
+      if (!decoded.uid || !decoded.email) {
+        res.status(401).json({ error: 'Firebase account must have a verified email address.' });
+        return;
+      }
+      req.firebaseUser = { uid: decoded.uid, email: decoded.email, emailVerified: Boolean(decoded.email_verified) };
+      next();
+    })
+    .catch(() => res.status(401).json({ error: 'Invalid or expired Firebase ID token.' }));
+}
+
+export function verifyFirebaseTokenWhenPresent(req: AuthRequest, res: Response, next: NextFunction): void {
+  if (!req.headers.authorization) {
+    next(); // Legacy local authentication remains available when Firebase is not configured.
+    return;
+  }
+  verifyFirebaseToken(req, res, next);
 }
 
 export function requireRole(roles: string[]) {
@@ -75,6 +119,17 @@ export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunctio
     }
   }
   next();
+}
+
+export async function verifySocketToken(token: string): Promise<JwtPayload> {
+  try {
+    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  } catch {
+    const decoded = await firebaseAdminAuth.verifyIdToken(token);
+    const user = db.prepare('SELECT id, email, role, institute_id FROM users WHERE id = ?').get(decoded.uid) as any;
+    if (!user) throw new Error('Account profile not found.');
+    return { userId: user.id, email: user.email, role: user.role, instituteId: user.institute_id };
+  }
 }
 
 export { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_EXPIRES_IN };

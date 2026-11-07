@@ -16,7 +16,7 @@ import {
   Download,
   AlertCircle,
 } from 'lucide-react';
-import { apiGet, apiPost, getToken } from '../../services/api';
+import { apiGet, apiPost } from '../../services/api';
 import { config } from '../../config/env';
 import { MOCK_LABS, MOCK_GUIDED_PRACTICALS } from '../../services/mockData';
 import { SqlWorkspace } from '../../components/labs/SqlWorkspace';
@@ -61,6 +61,8 @@ export const StudentLabDetail: React.FC = () => {
   // State for database-backed lab module
   const [dbLab, setDbLab] = useState<DbLabModule | null>(null);
   const [loadingDb, setLoadingDb] = useState(Boolean(!mockLab && labId));
+  const [loadError, setLoadError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [activeExIdx, setActiveExIdx] = useState(0);
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [outputs, setOutputs] = useState<Record<string, { stdout: string; stderr: string; timeMs?: number; provider?: string }>>({});
@@ -77,26 +79,38 @@ export const StudentLabDetail: React.FC = () => {
   );
 
   useEffect(() => {
-    // If not a predefined mock lab, attempt to fetch from backend
-    if (!mockLab && labId) {
-      setLoadingDb(true);
-      apiGet<DbLabModule>(`/labs/${labId}`)
-        .then((data) => {
-          setDbLab(data);
-          const initCodes: Record<string, string> = {};
-          data.exercises?.forEach((ex) => {
-            initCodes[ex.id] = ex.starterCode || '';
-          });
-          setCodes(initCodes);
-        })
-        .catch(() => {
-          // If not found in DB either, fallback to default python lab
-          const fallback = MOCK_LABS[0];
-          navigate(`/student/labs/${fallback.id}`, { replace: true });
-        })
-        .finally(() => setLoadingDb(false));
+    if (mockLab || !labId) {
+      setLoadingDb(false);
+      setLoadError('');
+      setDbLab(null);
+      return;
     }
-  }, [labId, mockLab, navigate]);
+
+    let isCurrentRequest = true;
+    setLoadingDb(true);
+    setLoadError('');
+    setDbLab(null);
+
+    apiGet<DbLabModule>(`/labs/${encodeURIComponent(labId)}`)
+      .then((data) => {
+        if (!isCurrentRequest) return;
+        setDbLab(data);
+        const initCodes: Record<string, string> = {};
+        data.exercises?.forEach((ex) => {
+          initCodes[ex.id] = ex.starterCode || '';
+        });
+        setCodes(initCodes);
+      })
+      .catch((err: unknown) => {
+        if (!isCurrentRequest) return;
+        setLoadError(err instanceof Error ? err.message : 'Unable to load this lab. Please try again.');
+      })
+      .finally(() => {
+        if (isCurrentRequest) setLoadingDb(false);
+      });
+
+    return () => { isCurrentRequest = false; };
+  }, [labId, mockLab, loadAttempt]);
 
   // 1. Specialized Engine: SQL Lab
   if (labId === 'lab-sql') {
@@ -252,6 +266,31 @@ export const StudentLabDetail: React.FC = () => {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="mx-auto flex min-h-[360px] max-w-xl flex-col items-center justify-center text-center">
+        <div className="mb-4 rounded-full bg-amber-50 p-3 text-amber-700"><AlertCircle className="h-6 w-6" /></div>
+        <h1 className="text-lg font-semibold text-navy-900">This lab could not be opened</h1>
+        <p role="alert" className="mt-2 text-sm text-brand-muted">{loadError}</p>
+        <div className="mt-5 flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/student/labs')}>Back to labs</Button>
+          <Button onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (dbLab && (!dbLab.exercises || dbLab.exercises.length === 0)) {
+    return (
+      <div className="mx-auto flex min-h-[360px] max-w-xl flex-col items-center justify-center text-center">
+        <div className="mb-4 rounded-full bg-blue-50 p-3 text-primary"><BookOpen className="h-6 w-6" /></div>
+        <h1 className="text-lg font-semibold text-navy-900">{dbLab.title}</h1>
+        <p className="mt-2 text-sm text-brand-muted">This lab is published, but the instructor has not added any exercises yet.</p>
+        <Button className="mt-5" variant="outline" onClick={() => navigate('/student/labs')}>Back to labs</Button>
+      </div>
+    );
+  }
+
   // 5. Database-Backed Teacher Lab Module with Dynamic Exercises
   if (dbLab && dbLab.exercises && dbLab.exercises.length > 0) {
     const activeEx = dbLab.exercises[activeExIdx] || dbLab.exercises[0];
@@ -261,15 +300,10 @@ export const StudentLabDetail: React.FC = () => {
     const runExerciseCode = async () => {
       setRunning(activeEx.id);
       try {
-        const res = await fetch(`${config.apiBaseUrl}/execute`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-          body: JSON.stringify({
+        const data = await apiPost<any>('/execute', {
             language: dbLab.language || 'python',
             code: currentCode,
-          }),
         });
-        const data = await res.json();
         const stdout = data.stdout || '';
         const stderr = data.stderr || '';
         setOutputs((prev) => ({

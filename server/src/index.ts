@@ -13,15 +13,23 @@ import { seedDatabase } from './db/seed';
 
 const app = express();
 const server = http.createServer(app);
+const corsAllowlist = config.corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean);
 
-// Initialize Socket.IO — allow all origins for Render
+function isOriginAllowed(origin: string | undefined, host: string | undefined): boolean {
+  if (!origin || corsAllowlist.includes('*') || corsAllowlist.includes(origin)) return true;
+  try { return new URL(origin).host === host; } catch { return false; }
+}
+
+// Socket.IO uses the same origin policy as the HTTP API. Cross-origin clients
+// must be added explicitly through CORS_ORIGIN.
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'], credentials: false },
+  cors: { origin: corsAllowlist.includes('*') ? '*' : (corsAllowlist.length ? corsAllowlist : false), methods: ['GET', 'POST'], credentials: false },
+  allowRequest: (req, callback) => callback(null, isOriginAllowed(req.headers.origin, req.headers.host)),
 });
 
 // Security & parsing middleware
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: '*', credentials: false }));
+app.use(cors({ origin: corsAllowlist.includes('*') ? '*' : (corsAllowlist.length ? corsAllowlist : false), credentials: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -64,7 +72,11 @@ if (clientDistPath) {
 async function start() {
   try {
     await initDatabase();
-    await seedDatabase();
+    if (config.nodeEnv !== 'production' || process.env.SEED_DEMO_DATA === 'true') {
+      await seedDatabase();
+    } else {
+      console.log('Demo seed data is disabled in production.');
+    }
   } catch (err) {
     console.error('Database init failed:', err);
     process.exit(1);
