@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcryptjs';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
+import { recordAudit } from './activityController';
 
 // POST /api/institutes/register — creates institute + admin account
 export async function registerInstitute(req: AuthRequest, res: Response): Promise<void> {
@@ -39,18 +40,21 @@ export async function registerInstitute(req: AuthRequest, res: Response): Promis
     const passwordHash = firebaseUser ? 'firebase-managed' : await bcrypt.hash(adminPassword, 10);
     const domains = JSON.stringify(Array.isArray(emailDomains) ? emailDomains : []);
 
-    db.prepare(`
-      INSERT INTO institutes (id, name, slug, type, city, website, email_domains, admin_user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(instituteId, instituteName.trim(), slugToUse, type || 'university', city || null, website || null, domains, adminId);
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO institutes (id, name, slug, type, city, website, email_domains, admin_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(instituteId, instituteName.trim(), slugToUse, type || 'university', city || null, website || null, domains, adminId);
 
-    db.prepare(`
-      INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
-      VALUES (?, ?, ?, ?, 'admin', ?, 1, 'active')
-    `).run(adminId, adminName.trim(), adminEmail.toLowerCase(), passwordHash, instituteId);
+      db.prepare(`
+        INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
+        VALUES (?, ?, ?, ?, 'admin', ?, 1, 'active')
+      `).run(adminId, adminName.trim(), adminEmail.toLowerCase(), passwordHash, instituteId);
 
-    // Update institute admin reference
-    db.prepare('UPDATE institutes SET admin_user_id = ? WHERE id = ?').run(adminId, instituteId);
+      db.prepare('UPDATE institutes SET admin_user_id = ? WHERE id = ?').run(adminId, instituteId);
+      db.prepare(`INSERT INTO audit_logs (id, institute_id, actor_id, actor_email, action, entity_type, entity_id, details, ip_address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(uuid(), instituteId, adminId, adminEmail.toLowerCase(), 'institute.created', 'institute', instituteId, `Created institute "${instituteName.trim()}".`, req.ip || null);
+    })();
 
     res.status(201).json({
       message: 'Institute registered successfully.',
@@ -132,6 +136,7 @@ export function updateDomains(req: AuthRequest, res: Response): void {
         .run(req.user!.instituteId, ...cleaned);
     }
   })();
+  recordAudit(req, 'institute.email_domains.updated', 'institute', req.user.instituteId, `Updated approved email domains (${cleaned.length} configured).`);
   res.json({ message: 'Email domains updated.', domains: cleaned });
 }
 

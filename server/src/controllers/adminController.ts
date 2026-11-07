@@ -1,9 +1,11 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
+import { randomBytes } from 'crypto';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
 import { firebaseAdminAuth, hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
+import { createNotification, recordAudit } from './activityController';
 
 // POST /api/admin/teachers — create teacher account
 export async function createTeacher(req: AuthRequest, res: Response): Promise<void> {
@@ -14,19 +16,24 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     }
 
     const { name, email, designation, department, employeeId } = req.body;
-    if (!name || !email) {
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       res.status(400).json({ error: 'Name and email are required.' });
       return;
     }
+    if ([designation, department, employeeId].some((value) => value !== undefined && value !== null && (typeof value !== 'string' || value.length > 120))) {
+      res.status(400).json({ error: 'Teacher profile fields must be 120 characters or fewer.' });
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
     if (existing) {
       res.status(409).json({ error: 'An account with this email already exists.' });
       return;
     }
 
     // Generate temporary password
-    const tempPassword = `Lumio@${Math.floor(100000 + Math.random() * 900000)}`;
+    const tempPassword = `Lumio@${randomBytes(9).toString('base64url')}7!`;
     if (process.env.NODE_ENV === 'production' && !hasFirebaseAdminCredentials) {
       res.status(503).json({ error: 'Teacher account provisioning requires FIREBASE_SERVICE_ACCOUNT_JSON in the server environment.' });
       return;
@@ -37,7 +44,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     if (hasFirebaseAdminCredentials) {
       try {
         const firebaseUser = await firebaseAdminAuth.createUser({
-          email: email.toLowerCase(), password: tempPassword, displayName: name.trim(), emailVerified: true,
+          email: normalizedEmail, password: tempPassword, displayName: name.trim(), emailVerified: true,
         });
         teacherId = firebaseUser.uid;
         firebaseUserCreated = true;
@@ -56,12 +63,13 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
         db.prepare(`
           INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
           VALUES (?, ?, ?, ?, 'teacher', ?, 1, 'active')
-        `).run(teacherId, name.trim(), email.toLowerCase(), passwordHash, req.user!.instituteId);
+        `).run(teacherId, name.trim(), normalizedEmail, passwordHash, req.user!.instituteId);
 
         db.prepare(`
           INSERT INTO teacher_profiles (user_id, designation, department, employee_id)
           VALUES (?, ?, ?, ?)
         `).run(teacherId, designation || null, department || null, employeeId || null);
+        recordAudit(req, 'teacher.created', 'user', teacherId, `Created teacher account for ${normalizedEmail}.`);
       })();
     } catch (err) {
       if (firebaseUserCreated) await firebaseAdminAuth.deleteUser(teacherId).catch(() => {});
@@ -70,7 +78,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
 
     res.status(201).json({
       message: 'Teacher account created.',
-      teacher: { id: teacherId, name, email, designation, department },
+      teacher: { id: teacherId, name: name.trim(), email: normalizedEmail, designation, department, status: 'active', created_at: new Date().toISOString() },
       temporaryPassword: tempPassword,
       note: 'Please share this temporary password securely. The teacher should change it upon first login.',
     });
@@ -157,6 +165,8 @@ export function updateUserStatus(req: AuthRequest, res: Response): void {
   }
 
   db.prepare('UPDATE users SET status = ? WHERE id = ?').run(status, id);
+  recordAudit(req, `user.${status}`, 'user', id, `Changed ${user.role} account status to ${status}.`);
+  createNotification(id, 'account_status', 'Account status updated', `Your account is now ${status}.`, `/${user.role}/settings`);
   res.json({ message: `User status updated to ${status}.` });
 }
 

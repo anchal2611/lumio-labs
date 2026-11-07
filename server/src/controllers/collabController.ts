@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
 import { notifySessionEnded } from '../sockets/collabSocket';
+import { recordAudit } from './activityController';
 
 // POST /api/collab/sessions
 export function createSession(req: AuthRequest, res: Response): void {
@@ -77,18 +78,18 @@ export function listSessions(req: AuthRequest, res: Response): void {
 
   // Students: see peer sessions + faculty sessions (but not class sessions of other institutes)
   if (user.role === 'student') {
-    query += ' AND (cs.class_id IS NULL OR cs.class_id IN (SELECT class_id FROM class_enrollments WHERE student_id = ?))';
-    params.push(user.userId);
+    query += ' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR cs.class_id IN (SELECT class_id FROM class_enrollments WHERE student_id = ?))';
+    params.push(user.userId, user.instituteId, user.instituteId, user.userId);
   } else if (user.role === 'teacher') {
-    query += ' AND (cs.class_id IS NULL OR c.teacher_id = ? OR cs.host_id = ?)';
-    params.push(user.userId, user.userId);
+    query += ' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR c.teacher_id = ?)';
+    params.push(user.userId, user.instituteId, user.instituteId, user.userId);
   } else if (user.role === 'admin') {
     if (!user.instituteId) {
       res.status(403).json({ error: 'Admin must be associated with an institute.' });
       return;
     }
-    query += ' AND (cs.class_id IS NULL OR c.institute_id = ? OR cs.host_id = ?)';
-    params.push(user.instituteId, user.userId);
+    query += ' AND (cs.host_id = ? OR u.institute_id = ? OR c.institute_id = ?)';
+    params.push(user.userId, user.instituteId, user.instituteId);
   }
 
   query += ' ORDER BY cs.created_at DESC LIMIT 50';
@@ -135,12 +136,21 @@ export function getSession(req: AuthRequest, res: Response): void {
 // DELETE /api/collab/sessions/:id — end session
 export function endSession(req: AuthRequest, res: Response): void {
   const { id } = req.params;
-  const session = db.prepare('SELECT * FROM collab_sessions WHERE id = ? AND host_id = ?').get(id, req.user!.userId) as any;
+  const session = db.prepare(`SELECT cs.*, u.institute_id AS host_institute_id, c.institute_id AS class_institute_id
+    FROM collab_sessions cs JOIN users u ON u.id = cs.host_id LEFT JOIN classes c ON c.id = cs.class_id WHERE cs.id = ?`).get(id) as any;
   if (!session) {
-    res.status(404).json({ error: 'Session not found or you are not the host.' });
+    res.status(404).json({ error: 'Session not found.' });
+    return;
+  }
+  const isHost = session.host_id === req.user!.userId;
+  const isInstituteAdmin = req.user!.role === 'admin' && req.user!.instituteId &&
+    (session.host_institute_id === req.user!.instituteId || session.class_institute_id === req.user!.instituteId);
+  if (!isHost && !isInstituteAdmin) {
+    res.status(403).json({ error: 'Only the host or an administrator from the same institute can end this session.' });
     return;
   }
   db.prepare('UPDATE collab_sessions SET is_active = 0 WHERE id = ?').run(id);
   notifySessionEnded(id);
+  recordAudit(req, 'collab_session.ended', 'collaboration_session', id, `Ended collaboration session "${session.name}".`);
   res.json({ message: 'Session ended.' });
 }

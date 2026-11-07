@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
+import { recordAudit } from './activityController';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,20 +23,39 @@ function ensureUniqueJoinCode(): string {
 export function createClass(req: AuthRequest, res: Response): void {
   try {
     const { name, subject, description, bannerColor } = req.body;
-    if (!name || !subject) {
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || typeof subject !== 'string' || !subject.trim() || subject.trim().length > 120) {
       res.status(400).json({ error: 'Class name and subject are required.' });
       return;
     }
+    if (description !== undefined && description !== null && (typeof description !== 'string' || description.length > 1000)) {
+      res.status(400).json({ error: 'Class description must be 1000 characters or fewer.' });
+      return;
+    }
 
+    let teacherId = req.user!.userId;
+    if (req.user!.role === 'admin') {
+      const requestedTeacherId = typeof req.body.teacherId === 'string' ? req.body.teacherId : '';
+      if (!req.user!.instituteId) {
+        res.status(403).json({ error: 'Admin must be associated with an institute.' });
+        return;
+      }
+      const teacher = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher' AND institute_id = ? AND status = 'active'").get(requestedTeacherId, req.user!.instituteId);
+      if (!teacher) {
+        res.status(400).json({ error: 'Choose an active teacher from your institute.' });
+        return;
+      }
+      teacherId = requestedTeacherId;
+    }
     const classId = uuid();
     const joinCode = ensureUniqueJoinCode();
 
     db.prepare(`
       INSERT INTO classes (id, name, subject, description, join_code, teacher_id, institute_id, banner_color)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(classId, name.trim(), subject.trim(), description || null, joinCode, req.user!.userId, req.user!.instituteId, bannerColor || '#2563EB');
+    `).run(classId, name.trim(), subject.trim(), description?.trim() || null, joinCode, teacherId, req.user!.instituteId, bannerColor || '#2563EB');
 
     const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId) as any;
+    recordAudit(req, 'class.created', 'class', classId, `Created class "${name.trim()}" (${subject.trim()}) for teacher ${teacherId}.`);
     res.status(201).json({ ...cls, joinCode });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create class.' });
@@ -91,6 +111,10 @@ export function joinClass(req: AuthRequest, res: Response): void {
   const cls = db.prepare('SELECT * FROM classes WHERE join_code = ? AND is_active = 1').get(joinCode.toUpperCase().trim()) as any;
   if (!cls) {
     res.status(404).json({ error: 'Invalid join code. Please check and try again.' });
+    return;
+  }
+  if (req.user!.instituteId && cls.institute_id && req.user!.instituteId !== cls.institute_id) {
+    res.status(403).json({ error: 'This class belongs to a different institute.' });
     return;
   }
 

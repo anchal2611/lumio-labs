@@ -1,70 +1,17 @@
-import React, { useState } from 'react';
-import { BookMarked, Upload, Plus, Download, Trash2, FileText } from 'lucide-react';
-import { MOCK_RESOURCES } from '../../services/mockData';
+import React, { useEffect, useState } from 'react';
+import { BookMarked, ExternalLink, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useToast } from '../../contexts/ToastContext';
+import { apiGet } from '../../services/api';
 
+type Resource = { id: string; title: string; description: string; category: string; file_type: string; file_size: string; download_url: string; author_name: string; class_name?: string | null };
 export const TeacherResources: React.FC = () => {
-  const toast = useToast();
-
-  const handleUpload = () => {
-    toast.success('Upload Ready', 'Select PDF manual or SQLite database file to broadcast to students.');
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <BookMarked className="w-5 h-5 text-teal-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-              Shared Teaching Repository
-            </h1>
-          </div>
-          <p className="text-xs text-brand-muted">
-            Upload and organize lab manuals, starter boilerplates, datasets, and circuit schematics
-          </p>
-        </div>
-
-        <Button
-          size="sm"
-          variant="accent"
-          leftIcon={<Upload className="w-3.5 h-3.5" />}
-          onClick={handleUpload}
-        >
-          Upload Lab Resource
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {MOCK_RESOURCES.map((r) => (
-          <Card key={r.id} className="border border-slate-200/80">
-            <CardContent className="p-5 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant="aqua" size="sm" className="uppercase font-mono">
-                    {r.fileType}
-                  </Badge>
-                  <span className="text-[11px] text-slate-400 font-mono">{r.fileSize}</span>
-                </div>
-                <h3 className="text-sm font-bold text-navy-900">{r.title}</h3>
-                <p className="text-xs text-brand-muted mt-1 leading-relaxed">{r.description}</p>
-              </div>
-
-              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">{r.downloadCount} Student Downloads</span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Replace File
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => { apiGet<{ resources: Resource[] }>('/resources').then((data) => setResources(data.resources || [])).catch((err) => setError(err instanceof Error ? err.message : 'Could not load resources.')).finally(() => setLoading(false)); }, []);
+  return <div className="space-y-6"><header><div className="mb-1 flex items-center gap-2"><BookMarked className="h-5 w-5 text-teal-600" /><h1 className="text-xl font-bold text-navy-900 sm:text-2xl">Institute resource library</h1></div><p className="text-sm text-brand-muted">Reference materials shared with your institute or assigned classes.</p></header>
+    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+    {loading ? <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-brand-muted"><Loader2 className="h-5 w-5 animate-spin" />Loading resources…</div> : resources.length ? <div className="grid gap-5 md:grid-cols-2">{resources.map((resource) => <Card key={resource.id}><CardContent className="p-5"><div className="flex items-center justify-between"><Badge variant="aqua" size="sm">{resource.file_type}</Badge><span className="text-[11px] text-slate-400">{resource.file_size}</span></div><h2 className="mt-3 text-sm font-bold text-navy-900">{resource.title}</h2><p className="mt-1 text-sm text-brand-muted">{resource.description}</p><p className="mt-3 text-xs text-slate-500">{resource.class_name ? `For ${resource.class_name} · ` : ''}Added by {resource.author_name}</p><a href={resource.download_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">Open resource <ExternalLink className="h-3 w-3" /></a></CardContent></Card>)}</div> : <Card className="border-dashed p-12 text-center"><BookMarked className="mx-auto mb-3 h-8 w-8 text-slate-300" /><h2 className="font-semibold text-navy-900">No resources yet</h2><p className="mt-1 text-sm text-brand-muted">Institute resources will appear here when an administrator shares them.</p></Card>}
+  </div>;
 };

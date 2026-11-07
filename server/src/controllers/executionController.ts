@@ -117,8 +117,8 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
         }),
       });
 
+      const result: any = await submissionResponse.json().catch(() => ({}));
       if (submissionResponse.ok) {
-        const result: any = await submissionResponse.json();
         res.json({
           stdout: result.stdout || '',
           stderr: result.stderr || result.compile_output || '',
@@ -129,15 +129,25 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
         });
         return;
       }
+      const providerMessage = typeof result.message === 'string' ? result.message.slice(0, 300) : '';
+      console.warn(`Judge0 returned HTTP ${submissionResponse.status}${providerMessage ? `: ${providerMessage}` : ''}`);
+      res.status(502).json({
+        error: `The code execution provider rejected this request (HTTP ${submissionResponse.status}).${providerMessage ? ` ${providerMessage}` : ' Check the Judge0 API key, host, and quota in Render.'}`,
+      });
+      return;
     } catch (err: any) {
       console.warn('Judge0 execution request failed:', err?.message);
+      if (config.nodeEnv === 'production') {
+        res.status(502).json({ error: 'Could not reach the code execution provider. Check JUDGE0_API_URL, service availability, and the Render network logs.' });
+        return;
+      }
     }
   }
 
   // Never execute submitted source code inside the web server process in
   // production. Local runtimes below are for development only.
   if (config.nodeEnv === 'production') {
-    res.status(503).json({ error: 'Code execution is temporarily unavailable. Configure the Judge0 provider.' });
+    res.status(503).json({ error: 'Code execution is not configured on this deployment. Add a valid JUDGE0_API_KEY to the Render web service environment, then redeploy.' });
     return;
   }
 

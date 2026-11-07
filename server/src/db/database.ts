@@ -188,5 +188,68 @@ export async function initDatabase(): Promise<void> {
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      institute_id TEXT NOT NULL,
+      member_a TEXT NOT NULL,
+      member_b TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(member_a, member_b)
+    );
+    CREATE TABLE IF NOT EXISTS conversation_members (
+      conversation_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      last_read_at TEXT,
+      PRIMARY KEY (conversation_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      sender_id TEXT NOT NULL,
+      client_message_id TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(sender_id, client_message_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at);
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      link TEXT,
+      read_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      institute_id TEXT NOT NULL,
+      actor_id TEXT,
+      actor_email TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      details TEXT NOT NULL DEFAULT '',
+      ip_address TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_institute_created ON audit_logs(institute_id, created_at);
+    CREATE TABLE IF NOT EXISTS resources (
+      id TEXT PRIMARY KEY,
+      institute_id TEXT NOT NULL,
+      class_id TEXT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'reference',
+      file_type TEXT NOT NULL DEFAULT 'link',
+      file_size TEXT NOT NULL DEFAULT '',
+      download_url TEXT NOT NULL,
+      uploader_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_resources_institute_created ON resources(institute_id, created_at);
   `);
 }

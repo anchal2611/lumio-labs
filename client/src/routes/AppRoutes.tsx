@@ -40,6 +40,7 @@ const TeacherLabBuilder = lazyPage(() => import('../pages/teacher/TeacherLabBuil
 const AdminDashboard = lazyPage(() => import('../pages/admin/AdminDashboard'), 'AdminDashboard');
 const AdminUsers = lazyPage(() => import('../pages/admin/AdminUsers'), 'AdminUsers');
 const AdminStudents = lazyPage(() => import('../pages/admin/AdminStudents'), 'AdminStudents');
+const AdminClasses = lazyPage(() => import('../pages/admin/AdminClasses'), 'AdminClasses');
 const AdminTeachers = lazyPage(() => import('../pages/admin/AdminTeachers'), 'AdminTeachers');
 const AdminLabs = lazyPage(() => import('../pages/admin/AdminLabs'), 'AdminLabs');
 const AdminAssignments = lazyPage(() => import('../pages/admin/AdminAssignments'), 'AdminAssignments');
@@ -48,6 +49,8 @@ const AdminSessions = lazyPage(() => import('../pages/admin/AdminSessions'), 'Ad
 const AdminReports = lazyPage(() => import('../pages/admin/AdminReports'), 'AdminReports');
 const AdminSettings = lazyPage(() => import('../pages/admin/AdminSettings'), 'AdminSettings');
 const CollabHub = lazyPage(() => import('../pages/collaboration/CollabHub'), 'CollabHub');
+const MessagesPage = lazyPage(() => import('../pages/shared/MessagesPage'), 'MessagesPage');
+const NotificationsPage = lazyPage(() => import('../pages/shared/NotificationsPage'), 'NotificationsPage');
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -106,6 +109,7 @@ export const AppRoutes: React.FC = () => {
                 <Route path="collaboration" element={<CollabHub />} />
                 <Route path="resources" element={<TeacherResources />} />
                 <Route path="messages" element={<TeacherMessages />} />
+                <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="analytics" element={<TeacherAnalytics />} />
                 <Route path="profile" element={<TeacherProfile />} />
                 <Route path="settings" element={<TeacherSettings />} />
@@ -127,6 +131,9 @@ export const AppRoutes: React.FC = () => {
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="students" element={<AdminStudents />} />
                 <Route path="teachers" element={<AdminTeachers />} />
+                <Route path="classes" element={<AdminClasses />} />
+                <Route path="messages" element={<MessagesPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="labs" element={<AdminLabs />} />
                 <Route path="assignments" element={<AdminAssignments />} />
                 <Route path="resources" element={<AdminResources />} />

@@ -58,6 +58,7 @@ export const Sidebar: React.FC = () => {
     { to: '/teacher/collaboration', label: 'Collab Hub', icon: Zap, badge: 'Live' },
     { to: '/teacher/resources', label: 'Shared Resources', icon: BookMarked },
     { to: '/teacher/messages', label: 'Messages', icon: MessageSquare },
+    { to: '/teacher/notifications', label: 'Notifications', icon: Bell },
     { to: '/teacher/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/teacher/settings', label: 'Settings', icon: Settings },
   ];
@@ -67,6 +68,9 @@ export const Sidebar: React.FC = () => {
     { to: '/admin/users', label: 'User Directory', icon: ShieldCheck },
     { to: '/admin/students', label: 'Student Accounts', icon: GraduationCap },
     { to: '/admin/teachers', label: 'Teacher Verification', icon: Users2 },
+    { to: '/admin/classes', label: 'Institute Classes', icon: BookOpen },
+    { to: '/admin/messages', label: 'Messages', icon: MessageSquare },
+    { to: '/admin/notifications', label: 'Notifications', icon: Bell },
     { to: '/admin/labs', label: 'Lab Configuration', icon: FlaskConical },
     { to: '/admin/assignments', label: 'Assignment Logs', icon: ClipboardList },
     { to: '/admin/resources', label: 'System Resources', icon: BookMarked },

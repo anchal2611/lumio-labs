@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -13,15 +13,17 @@ import {
   FlaskConical,
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { MOCK_NOTIFICATIONS } from '../../services/mockData';
+import { apiGet, apiPatch } from '../../services/api';
+
+type NavbarNotification = { id: string; title: string; body: string; link?: string | null; read_at?: string | null; created_at: string };
 
 export const Navbar: React.FC = () => {
   const { user, role, logout } = useAuth();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-
-  const unreadNotifs = MOCK_NOTIFICATIONS.filter((n) => !n.isRead);
+  const [notifications, setNotifications] = useState<NavbarNotification[]>([]);
+  const unreadNotifs = notifications.filter((notification) => !notification.read_at);
 
   const getDashboardPath = () => {
     if (role === 'student') return '/student/dashboard';
@@ -33,6 +35,34 @@ export const Navbar: React.FC = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const loadNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await apiGet<{ notifications: NavbarNotification[] }>('/notifications?limit=20');
+      setNotifications(data.notifications || []);
+    } catch { /* The page shows request errors; keep the navbar unobtrusive. */ }
+  }, [user]);
+  useEffect(() => {
+    void loadNotifications();
+    if (!user) return;
+    const timer = window.setInterval(() => void loadNotifications(), 30000);
+    return () => window.clearInterval(timer);
+  }, [loadNotifications, user]);
+
+  const markAllNotificationsRead = async () => {
+    try { await apiPatch('/notifications/read-all'); await loadNotifications(); }
+    catch { /* The notification center provides the actionable error state. */ }
+  };
+
+  const openNotification = async (notification: NavbarNotification) => {
+    if (!notification.read_at) {
+      await apiPatch(`/notifications/${encodeURIComponent(notification.id)}/read`).catch(() => {});
+      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item));
+    }
+    setShowNotifMenu(false);
+    navigate(notification.link || `/${role}/notifications`);
   };
 
   return (
@@ -58,19 +88,19 @@ export const Navbar: React.FC = () => {
         {user && (
           <div className="hidden md:flex items-center gap-1 pl-4 border-l border-slate-200">
             <Link
-              to={role === 'student' ? '/student/labs' : '/teacher/labs'}
+              to={role === 'student' ? '/student/labs' : role === 'admin' ? '/admin/labs' : '/teacher/labs'}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-muted hover:text-navy-900 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <FlaskConical className="w-3.5 h-3.5 text-primary" />
-              <span>Explore Labs</span>
+              <span>{role === 'admin' ? 'Lab Configuration' : 'Explore Labs'}</span>
             </Link>
-            <Link
+            {role !== 'admin' && <Link
               to={role === 'student' ? '/student/collaboration' : '/teacher/collaboration'}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-muted hover:text-navy-900 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <Layers className="w-3.5 h-3.5 text-teal-600" />
               <span>Collaboration</span>
-            </Link>
+            </Link>}
           </div>
         )}
       </div>
@@ -100,7 +130,7 @@ export const Navbar: React.FC = () => {
             >
               <Bell className="w-4 h-4" />
               {unreadNotifs.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary ring-2 ring-white"></span>
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white ring-2 ring-white">{unreadNotifs.length > 9 ? '9+' : unreadNotifs.length}</span>
               )}
             </button>
 
@@ -108,32 +138,24 @@ export const Navbar: React.FC = () => {
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-floating border border-slate-200 p-3 z-50 animate-fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
                   <h4 className="text-xs font-bold text-navy-900">Notifications</h4>
-                  <span className="text-[11px] text-primary font-medium cursor-pointer">
-                    Mark all read
-                  </span>
+                  <button type="button" disabled={!unreadNotifs.length} onClick={() => void markAllNotificationsRead()} className="text-[11px] font-medium text-primary disabled:cursor-default disabled:text-slate-400">Mark all read</button>
                 </div>
                 <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto mt-1">
-                  {MOCK_NOTIFICATIONS.map((notif) => (
-                    <div
-                      key={notif.id}
-                      onClick={() => {
-                        setShowNotifMenu(false);
-                        if (notif.link) navigate(notif.link);
-                      }}
-                      className="p-2.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors text-left"
-                    >
+                  {notifications.length === 0 ? <p className="p-4 text-center text-xs text-brand-muted">No notifications yet.</p> : notifications.slice(0, 10).map((notif) => (
+                    <button type="button" key={notif.id} onClick={() => void openNotification(notif)} className="block w-full rounded-lg p-2.5 text-left transition-colors hover:bg-slate-50">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-navy-900">{notif.title}</span>
-                        {!notif.isRead && (
+                        {!notif.read_at && (
                           <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                         )}
                       </div>
                       <p className="text-[11px] text-brand-muted mt-0.5 leading-snug">
-                        {notif.message}
+                        {notif.body}
                       </p>
-                    </div>
+                    </button>
                   ))}
                 </div>
+                <Link to={`/${role}/notifications`} onClick={() => setShowNotifMenu(false)} className="mt-2 block border-t border-slate-100 pt-2 text-center text-[11px] font-semibold text-primary">Open notification center</Link>
               </div>
             )}
           </div>

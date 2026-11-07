@@ -23,6 +23,9 @@ import { createAssignment, listAssignments, submitAssignment, getSubmissions, gr
 // Collab
 import { createSession, listSessions, getSession, endSession } from '../controllers/collabController';
 import { hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
+import { listAuditLogs, listNotifications, markAllNotificationsRead, markNotificationRead } from '../controllers/activityController';
+import { getConversationMessages, listConversations, listMessageContacts, sendMessage } from '../controllers/messageController';
+import { createResource, deleteResource, listResources } from '../controllers/resourceController';
 
 export const apiRouter = Router();
 
@@ -60,9 +63,22 @@ apiRouter.get('/admin/teachers', verifyToken, requireRole(['admin']), getTeacher
 apiRouter.get('/admin/students', verifyToken, requireRole(['admin']), getStudents as any);
 apiRouter.patch('/admin/users/:id/status', verifyToken, requireRole(['admin']), updateUserStatus as any);
 apiRouter.get('/admin/stats', verifyToken, requireRole(['admin']), getStats as any);
+apiRouter.get('/admin/audit-logs', verifyToken, requireRole(['admin']), listAuditLogs as any);
+
+// Messaging & notifications
+apiRouter.get('/messages/contacts', verifyToken, listMessageContacts as any);
+apiRouter.get('/messages/conversations', verifyToken, listConversations as any);
+apiRouter.get('/messages/conversations/:id', verifyToken, getConversationMessages as any);
+apiRouter.post('/messages', verifyToken, sendMessage as any);
+apiRouter.get('/notifications', verifyToken, listNotifications as any);
+apiRouter.patch('/notifications/read-all', verifyToken, markAllNotificationsRead as any);
+apiRouter.patch('/notifications/:id/read', verifyToken, markNotificationRead as any);
+apiRouter.get('/resources', verifyToken, listResources as any);
+apiRouter.post('/resources', verifyToken, requireRole(['admin']), createResource as any);
+apiRouter.delete('/resources/:id', verifyToken, requireRole(['admin']), deleteResource as any);
 
 // ─── Classes ──────────────────────────────────────────
-apiRouter.post('/classes', verifyToken, requireRole(['teacher']), createClass as any);
+apiRouter.post('/classes', verifyToken, requireRole(['teacher', 'admin']), createClass as any);
 apiRouter.get('/classes', verifyToken, listClasses as any);
 apiRouter.post('/classes/join', verifyToken, requireRole(['student']), joinClass as any);
 apiRouter.get('/classes/:id', verifyToken, getClass as any);
@@ -71,11 +87,11 @@ apiRouter.delete('/classes/:id', verifyToken, requireRole(['teacher']), deleteCl
 apiRouter.patch('/classes/:id/regenerate-code', verifyToken, requireRole(['teacher']), regenerateCode as any);
 
 // ─── Labs ─────────────────────────────────────────────
-apiRouter.post('/labs', verifyToken, requireRole(['teacher']), createLab as any);
+apiRouter.post('/labs', verifyToken, requireRole(['teacher', 'admin']), createLab as any);
 apiRouter.get('/labs', verifyToken, listLabs as any);
 apiRouter.get('/labs/:id', verifyToken, getLab as any);
-apiRouter.put('/labs/:id', verifyToken, requireRole(['teacher']), updateLab as any);
-apiRouter.delete('/labs/:id', verifyToken, requireRole(['teacher']), deleteLab as any);
+apiRouter.put('/labs/:id', verifyToken, requireRole(['teacher', 'admin']), updateLab as any);
+apiRouter.delete('/labs/:id', verifyToken, requireRole(['teacher', 'admin']), deleteLab as any);
 
 // ─── Assignments ──────────────────────────────────────
 apiRouter.post('/assignments', verifyToken, requireRole(['teacher']), createAssignment as any);
