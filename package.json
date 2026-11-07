@@ -5,13 +5,14 @@
   "engines": { "node": ">=22 <25" },
   "description": "LUMIO — Collaborative Virtual Laboratory Platform",
   "scripts": {
+    "install:all": "npm ci --prefix server && npm ci --prefix client",
     "dev:client": "npm --prefix client run dev",
     "dev:server": "npm --prefix server run dev",
-    "build:client": "npm --prefix client ci && npm --prefix client run build",
-    "build:server": "npm --prefix server ci && npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
     "build": "npm run build:server && npm run build:client",
     "start": "node server/dist/index.js",
-    "render-build": "npm --prefix server ci && npm --prefix server run build && npm --prefix client ci && npm --prefix client run build"
+    "render-build": "npm run install:all && npm run build"
   },
   "keywords": ["virtual-labs", "education", "collaboration", "monaco", "sqlite"],
   "author": "LUMIO Engineering Team",
