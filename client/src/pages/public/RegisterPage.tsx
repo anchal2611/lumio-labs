@@ -10,7 +10,7 @@ interface RegisterForm {
   email: string;
   password: string;
   confirmPassword: string;
-  role: 'student' | 'teacher';
+  role: 'student';
   branch?: string;
   semester?: number;
   department?: string;
@@ -24,7 +24,7 @@ export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [domainCheck, setDomainCheck] = useState<{ matched: boolean; institute?: { name: string } } | null>(null);
   const [checkingDomain, setCheckingDomain] = useState(false);
-  const { register, handleSubmit, watch, setValue, formState: { isSubmitting, errors } } = useForm<RegisterForm>({ defaultValues: { role: 'student' } });
+  const { register, handleSubmit, watch, formState: { isSubmitting, errors } } = useForm<RegisterForm>({ defaultValues: { role: 'student' } });
 
   const watchEmail = watch('email');
   const watchRole = watch('role');
@@ -41,7 +41,6 @@ export const RegisterPage: React.FC = () => {
       try {
         const result = await apiGet<any>(`/auth/check-domain?email=${encodeURIComponent(watchEmail)}`);
         setDomainCheck(result);
-        if (result.matched) setValue('role', 'student');
       } catch { setDomainCheck(null); }
       finally { setCheckingDomain(false); }
     }, 600);
@@ -59,7 +58,7 @@ export const RegisterPage: React.FC = () => {
         name: data.name,
         email: data.email,
         password: data.password,
-        role: domainCheck?.matched ? 'student' : data.role,
+        role: 'student',
         branch: data.branch,
         semester: data.semester ? Number(data.semester) : undefined,
         department: data.department,
@@ -107,20 +106,7 @@ export const RegisterPage: React.FC = () => {
                 </div>
               )}
             </div>
-            {/* Role selection — only if no institute domain match */}
-            {!domainCheck?.matched && (
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">I am a</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['student', 'teacher'] as const).map((r) => (
-                    <button key={r} type="button" onClick={() => setValue('role', r)}
-                      className={`py-3 rounded-xl border font-medium text-sm capitalize transition-all ${
-                        watchRole === r ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-500'
-                      }`}>{r}</button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <p className="rounded-xl border border-slate-700/70 bg-slate-800/40 px-4 py-3 text-xs leading-relaxed text-slate-400">Student sign-up. Faculty and institute administrator accounts are created by an institute administrator.</p>
             {/* Student fields */}
             {(domainCheck?.matched || watchRole === 'student') && (
               <div className="grid grid-cols-2 gap-3">
@@ -135,13 +121,6 @@ export const RegisterPage: React.FC = () => {
                     {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-              </div>
-            )}
-            {/* Teacher fields */}
-            {!domainCheck?.matched && watchRole === 'teacher' && (
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Designation</label>
-                <input {...register('designation')} className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" placeholder="Assistant Professor" />
               </div>
             )}
             <div>

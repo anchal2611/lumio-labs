@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { Submission, RubricCriterion } from '../../types/assignment';
+import { Submission } from '../../types/assignment';
 import {
   Award,
-  CheckCircle2,
   X,
   FileCode,
   Terminal,
-  MessageSquare,
-  Sparkles,
-  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -17,7 +14,7 @@ import { useToast } from '../../contexts/ToastContext';
 interface GradingDrawerProps {
   submission: Submission;
   onClose: () => void;
-  onSaveGrade: (marks: number, feedback: string, rubricScores?: Record<string, number>) => void;
+  onSaveGrade: (marks: number, feedback: string, rubricScores?: Record<string, number>) => void | Promise<void>;
 }
 
 export const GradingDrawer: React.FC<GradingDrawerProps> = ({
@@ -27,16 +24,21 @@ export const GradingDrawer: React.FC<GradingDrawerProps> = ({
 }) => {
   const [marks, setMarks] = useState<number>(submission.marksObtained ?? submission.maxMarks);
   const [feedback, setFeedback] = useState<string>(
-    submission.feedback || 'Great solution! Good code structure and test execution.'
+    submission.feedback || ''
   );
-
+  const [saving, setSaving] = useState(false);
   const toast = useToast();
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveGrade(marks, feedback);
-    toast.success('Grade Published', `Awarded ${marks}/${submission.maxMarks} to ${submission.studentName}`);
-    onClose();
+    if (!Number.isFinite(marks) || marks < 0 || marks > submission.maxMarks) {
+      toast.error('Invalid marks', `Enter a score between 0 and ${submission.maxMarks}.`);
+      return;
+    }
+    setSaving(true);
+    try { await onSaveGrade(marks, feedback); onClose(); }
+    catch { /* Caller reports the API error; keep the drawer open for retry. */ }
+    finally { setSaving(false); }
   };
 
   return (
@@ -130,11 +132,11 @@ export const GradingDrawer: React.FC<GradingDrawerProps> = ({
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3">
-              <Button size="sm" variant="outline" type="button" onClick={onClose}>
+              <Button size="sm" variant="outline" type="button" onClick={onClose} disabled={saving}>
                 Cancel
               </Button>
-              <Button size="sm" variant="primary" type="submit" leftIcon={<Award className="w-3.5 h-3.5" />}>
-                Publish Evaluation
+              <Button size="sm" variant="primary" type="submit" disabled={saving} leftIcon={saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Award className="w-3.5 h-3.5" />}>
+                {saving ? 'Publishing…' : 'Publish evaluation'}
               </Button>
             </div>
           </form>

@@ -1,64 +1,57 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
 import { RoleShell } from '../components/layout/RoleShell';
 
-// Public Pages
-import { LandingPage } from '../pages/public/LandingPage';
-import { LoginPage } from '../pages/public/LoginPage';
-import { RegisterPage } from '../pages/public/RegisterPage';
-import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage';
-import { InstituteRegisterPage } from '../pages/public/InstituteRegisterPage';
+const lazyPage = (load: () => Promise<any>, exportName: string) =>
+  React.lazy(async () => ({ default: (await load())[exportName] }));
 
-// Student Pages
-import { StudentDashboard } from '../pages/student/StudentDashboard';
-import { StudentLabsExplore } from '../pages/student/StudentLabsExplore';
-import { StudentLabDetail } from '../pages/student/StudentLabDetail';
-import { StudentExperiments } from '../pages/student/StudentExperiments';
-import { StudentAssignments } from '../pages/student/StudentAssignments';
-import { StudentCollaboration } from '../pages/student/StudentCollaboration';
-import { StudentProjects } from '../pages/student/StudentProjects';
-import { StudentMessages } from '../pages/student/StudentMessages';
-import { StudentResources } from '../pages/student/StudentResources';
-import { StudentNotifications } from '../pages/student/StudentNotifications';
-import { StudentProfile } from '../pages/student/StudentProfile';
-import { StudentSettings } from '../pages/student/StudentSettings';
-import { StudentClasses } from '../pages/student/StudentClasses';
-import { StudentClassDetail } from '../pages/student/StudentClassDetail';
-
-// Teacher Pages
-import { TeacherDashboard } from '../pages/teacher/TeacherDashboard';
-import { TeacherLabs } from '../pages/teacher/TeacherLabs';
-import { TeacherPracticals } from '../pages/teacher/TeacherPracticals';
-import { TeacherAssignments } from '../pages/teacher/TeacherAssignments';
-import { TeacherStudents } from '../pages/teacher/TeacherStudents';
-import { TeacherCollaboration } from '../pages/teacher/TeacherCollaboration';
-import { TeacherResources } from '../pages/teacher/TeacherResources';
-import { TeacherMessages } from '../pages/teacher/TeacherMessages';
-import { TeacherAnalytics } from '../pages/teacher/TeacherAnalytics';
-import { TeacherProfile } from '../pages/teacher/TeacherProfile';
-import { TeacherSettings } from '../pages/teacher/TeacherSettings';
-import { TeacherClasses } from '../pages/teacher/TeacherClasses';
-import { TeacherClassDetail } from '../pages/teacher/TeacherClassDetail';
-import { TeacherLabBuilder } from '../pages/teacher/TeacherLabBuilder';
-
-// Admin Pages
-import { AdminDashboard } from '../pages/admin/AdminDashboard';
-import { AdminUsers } from '../pages/admin/AdminUsers';
-import { AdminStudents } from '../pages/admin/AdminStudents';
-import { AdminTeachers } from '../pages/admin/AdminTeachers';
-import { AdminLabs } from '../pages/admin/AdminLabs';
-import { AdminAssignments } from '../pages/admin/AdminAssignments';
-import { AdminResources } from '../pages/admin/AdminResources';
-import { AdminSessions } from '../pages/admin/AdminSessions';
-import { AdminReports } from '../pages/admin/AdminReports';
-import { AdminSettings } from '../pages/admin/AdminSettings';
-
-// Collab Hub (shared)
-import { CollabHub } from '../pages/collaboration/CollabHub';
+const LandingPage = lazyPage(() => import('../pages/public/LandingPage'), 'LandingPage');
+const LoginPage = lazyPage(() => import('../pages/public/LoginPage'), 'LoginPage');
+const RegisterPage = lazyPage(() => import('../pages/public/RegisterPage'), 'RegisterPage');
+const ForgotPasswordPage = lazyPage(() => import('../pages/public/ForgotPasswordPage'), 'ForgotPasswordPage');
+const InstituteRegisterPage = lazyPage(() => import('../pages/public/InstituteRegisterPage'), 'InstituteRegisterPage');
+const StudentDashboard = lazyPage(() => import('../pages/student/StudentDashboard'), 'StudentDashboard');
+const StudentLabsExplore = lazyPage(() => import('../pages/student/StudentLabsExplore'), 'StudentLabsExplore');
+const StudentLabDetail = lazyPage(() => import('../pages/student/StudentLabDetail'), 'StudentLabDetail');
+const StudentExperiments = lazyPage(() => import('../pages/student/StudentExperiments'), 'StudentExperiments');
+const StudentAssignments = lazyPage(() => import('../pages/student/StudentAssignments'), 'StudentAssignments');
+const StudentProjects = lazyPage(() => import('../pages/student/StudentProjects'), 'StudentProjects');
+const StudentMessages = lazyPage(() => import('../pages/student/StudentMessages'), 'StudentMessages');
+const StudentResources = lazyPage(() => import('../pages/student/StudentResources'), 'StudentResources');
+const StudentNotifications = lazyPage(() => import('../pages/student/StudentNotifications'), 'StudentNotifications');
+const StudentProfile = lazyPage(() => import('../pages/student/StudentProfile'), 'StudentProfile');
+const StudentSettings = lazyPage(() => import('../pages/student/StudentSettings'), 'StudentSettings');
+const StudentClasses = lazyPage(() => import('../pages/student/StudentClasses'), 'StudentClasses');
+const StudentClassDetail = lazyPage(() => import('../pages/student/StudentClassDetail'), 'StudentClassDetail');
+const TeacherDashboard = lazyPage(() => import('../pages/teacher/TeacherDashboard'), 'TeacherDashboard');
+const TeacherLabs = lazyPage(() => import('../pages/teacher/TeacherLabs'), 'TeacherLabs');
+const TeacherPracticals = lazyPage(() => import('../pages/teacher/TeacherPracticals'), 'TeacherPracticals');
+const TeacherAssignments = lazyPage(() => import('../pages/teacher/TeacherAssignments'), 'TeacherAssignments');
+const TeacherStudents = lazyPage(() => import('../pages/teacher/TeacherStudents'), 'TeacherStudents');
+const TeacherResources = lazyPage(() => import('../pages/teacher/TeacherResources'), 'TeacherResources');
+const TeacherMessages = lazyPage(() => import('../pages/teacher/TeacherMessages'), 'TeacherMessages');
+const TeacherAnalytics = lazyPage(() => import('../pages/teacher/TeacherAnalytics'), 'TeacherAnalytics');
+const TeacherProfile = lazyPage(() => import('../pages/teacher/TeacherProfile'), 'TeacherProfile');
+const TeacherSettings = lazyPage(() => import('../pages/teacher/TeacherSettings'), 'TeacherSettings');
+const TeacherClasses = lazyPage(() => import('../pages/teacher/TeacherClasses'), 'TeacherClasses');
+const TeacherClassDetail = lazyPage(() => import('../pages/teacher/TeacherClassDetail'), 'TeacherClassDetail');
+const TeacherLabBuilder = lazyPage(() => import('../pages/teacher/TeacherLabBuilder'), 'TeacherLabBuilder');
+const AdminDashboard = lazyPage(() => import('../pages/admin/AdminDashboard'), 'AdminDashboard');
+const AdminUsers = lazyPage(() => import('../pages/admin/AdminUsers'), 'AdminUsers');
+const AdminStudents = lazyPage(() => import('../pages/admin/AdminStudents'), 'AdminStudents');
+const AdminTeachers = lazyPage(() => import('../pages/admin/AdminTeachers'), 'AdminTeachers');
+const AdminLabs = lazyPage(() => import('../pages/admin/AdminLabs'), 'AdminLabs');
+const AdminAssignments = lazyPage(() => import('../pages/admin/AdminAssignments'), 'AdminAssignments');
+const AdminResources = lazyPage(() => import('../pages/admin/AdminResources'), 'AdminResources');
+const AdminSessions = lazyPage(() => import('../pages/admin/AdminSessions'), 'AdminSessions');
+const AdminReports = lazyPage(() => import('../pages/admin/AdminReports'), 'AdminReports');
+const AdminSettings = lazyPage(() => import('../pages/admin/AdminSettings'), 'AdminSettings');
+const CollabHub = lazyPage(() => import('../pages/collaboration/CollabHub'), 'CollabHub');
 
 export const AppRoutes: React.FC = () => {
   return (
+    <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">Loading page…</div>}>
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
@@ -150,5 +143,6 @@ export const AppRoutes: React.FC = () => {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 };

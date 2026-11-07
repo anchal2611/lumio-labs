@@ -1,88 +1,31 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, Plus, ArrowRight, Settings, Users, BookOpen } from 'lucide-react';
-import { MOCK_LABS } from '../../services/mockData';
+import { FlaskConical, Plus, AlertCircle, Loader2 } from 'lucide-react';
+import { apiGet } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useLabStore } from '../../store/useLabStore';
+
+type Lab = { id: string; title: string; description?: string; category: string; language: string; is_published: number; exercises: unknown[] };
 
 export const TeacherLabs: React.FC = () => {
   const navigate = useNavigate();
-  const { setActiveLab } = useLabStore();
+  const [labs, setLabs] = useState<Lab[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const loadLabs = useCallback(async () => {
+    setLoading(true); setError('');
+    try { const data = await apiGet<{ labs: Lab[] }>('/labs'); setLabs(data.labs || []); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not load your labs.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void loadLabs(); }, [loadLabs]);
 
-  const handleLaunchLab = (lab: any) => {
-    setActiveLab(lab);
-    navigate(`/student/labs/${lab.id}`);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <FlaskConical className="w-5 h-5 text-teal-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-              My Teaching Laboratories
-            </h1>
-          </div>
-          <p className="text-xs text-brand-muted">
-            Configure practical modules, test student compiler environments, and inspect starter templates
-          </p>
-        </div>
-
-        <Button
-          size="sm"
-          variant="accent"
-          leftIcon={<Plus className="w-3.5 h-3.5" />}
-          onClick={() => navigate('/teacher/labs/new')}
-        >
-          Create New Lab Station
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MOCK_LABS.map((lab) => (
-          <Card key={lab.id} className="border border-slate-200/80 flex flex-col justify-between">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <Badge variant="aqua" size="sm" className="capitalize">
-                  {lab.category}
-                </Badge>
-                <span className="text-xs text-emerald-600 font-semibold">Active & Supervised</span>
-              </div>
-
-              <h3 className="text-base font-bold text-navy-900">{lab.name}</h3>
-              <p className="text-xs text-brand-muted mt-1 leading-relaxed line-clamp-2">
-                {lab.description}
-              </p>
-
-              <div className="flex items-center gap-1.5 flex-wrap mt-3">
-                {lab.tools.map((t) => (
-                  <span key={t} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                    {t}
-                  </span>
-                ))}
-              </div>
-
-              <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs text-slate-500 font-medium">
-                  {lab.experimentCount} Practicals Configured
-                </span>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                  onClick={() => handleLaunchLab(lab)}
-                >
-                  Test Workspace
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  return <div className="space-y-6">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-1 flex items-center gap-2"><FlaskConical className="h-5 w-5 text-teal-600" /><h1 className="text-xl font-bold text-navy-900 sm:text-2xl">My teaching laboratories</h1></div><p className="text-sm text-brand-muted">Create and publish practical modules for your classes.</p></div><Button size="sm" variant="accent" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => navigate('/teacher/labs/new')}>Create lab</Button></header>
+    {error && <div role="alert" className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+    {loading ? <Card><CardContent className="py-14 text-center text-brand-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading your labs…</CardContent></Card>
+      : labs.length === 0 ? <Card><CardContent className="py-12 text-center"><FlaskConical className="mx-auto mb-3 h-8 w-8 text-slate-300" /><h2 className="font-semibold text-navy-900">No labs yet</h2><p className="mt-1 text-sm text-brand-muted">Create your first lab to get started.</p><Button className="mt-4" size="sm" onClick={() => navigate('/teacher/labs/new')}>Create lab</Button></CardContent></Card>
+      : <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">{labs.map((lab) => <Card key={lab.id}><CardContent className="flex h-full flex-col p-5"><div className="mb-3 flex items-center justify-between gap-2"><Badge variant="aqua" size="sm" className="capitalize">{lab.category}</Badge><Badge variant={lab.is_published ? 'success' : 'warning'} size="sm">{lab.is_published ? 'Published' : 'Draft'}</Badge></div><h2 className="font-semibold text-navy-900">{lab.title}</h2><p className="mt-1 line-clamp-2 text-sm text-brand-muted">{lab.description || 'No description provided.'}</p><div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4 mt-4 text-xs text-slate-600"><span className="uppercase">{lab.language}</span><span>{lab.exercises?.length || 0} exercises</span></div></CardContent></Card>)}</div>}
+  </div>;
 };

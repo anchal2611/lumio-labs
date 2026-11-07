@@ -19,11 +19,34 @@ export function createAssignment(req: AuthRequest, res: Response): void {
       return;
     }
 
+    const lab = db.prepare('SELECT id, class_id FROM lab_modules WHERE id = ? AND teacher_id = ?').get(labModuleId, req.user!.userId) as any;
+    if (!lab || (lab.class_id && lab.class_id !== classId)) {
+      res.status(400).json({ error: 'Choose one of your labs assigned to this class.' });
+      return;
+    }
+    if (typeof title !== 'string' || !title.trim() || title.trim().length > 160) {
+      res.status(400).json({ error: 'Assignment title must be between 1 and 160 characters.' });
+      return;
+    }
+    if (description !== undefined && description !== null && (typeof description !== 'string' || description.length > 4000)) {
+      res.status(400).json({ error: 'Assignment description must be 4000 characters or fewer.' });
+      return;
+    }
+    if (dueDate && (typeof dueDate !== 'string' || Number.isNaN(Date.parse(dueDate)))) {
+      res.status(400).json({ error: 'Due date must be a valid date.' });
+      return;
+    }
+    const marks = Number(maxMarks ?? 100);
+    if (!Number.isFinite(marks) || marks < 1 || marks > 10000) {
+      res.status(400).json({ error: 'Maximum marks must be between 1 and 10000.' });
+      return;
+    }
+
     const id = uuid();
     db.prepare(`
       INSERT INTO assignments (id, lab_module_id, class_id, title, description, due_date, max_marks)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, labModuleId, classId, title.trim(), description || null, dueDate || null, maxMarks || 100);
+    `).run(id, labModuleId, classId, title.trim(), description || null, dueDate || null, marks);
 
     const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(id);
     res.status(201).json(assignment);
@@ -40,14 +63,23 @@ export function listAssignments(req: AuthRequest, res: Response): void {
   let assignments: any[];
   if (user.role === 'teacher' || user.role === 'admin') {
     let query = `
-      SELECT a.*, c.name as class_name, lm.title as lab_title,
+      SELECT a.*, c.name as class_name, lm.title as lab_title, u.name as teacher_name,
         (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) as submission_count
       FROM assignments a
       JOIN classes c ON c.id = a.class_id
       JOIN lab_modules lm ON lm.id = a.lab_module_id
+      JOIN users u ON u.id = c.teacher_id
       WHERE c.teacher_id = ?
     `;
     const params: any[] = [user.userId];
+    if (user.role === 'admin') {
+      if (!user.instituteId) {
+        res.status(403).json({ error: 'Admin must be associated with an institute.' });
+        return;
+      }
+      query = query.replace('WHERE c.teacher_id = ?', 'WHERE c.institute_id = ?');
+      params[0] = user.instituteId;
+    }
     if (classId) { query += ' AND a.class_id = ?'; params.push(classId); }
     query += ' ORDER BY a.created_at DESC';
     assignments = db.prepare(query).all(...params);
@@ -55,7 +87,7 @@ export function listAssignments(req: AuthRequest, res: Response): void {
     // Students: get assignments from enrolled classes
     let query = `
       SELECT a.*, c.name as class_name, lm.title as lab_title,
-        s.id as submission_id, s.status as submission_status, s.marks, s.submitted_at
+        s.id as submission_id, s.status as submission_status, s.marks, s.feedback as submission_feedback, s.submitted_at, s.graded_at
       FROM assignments a
       JOIN classes c ON c.id = a.class_id
       JOIN lab_modules lm ON lm.id = a.lab_module_id
@@ -99,10 +131,14 @@ export function submitAssignment(req: AuthRequest, res: Response): void {
         code = excluded.code,
         notes = excluded.notes,
         status = 'submitted',
-        submitted_at = datetime('now')
+        submitted_at = datetime('now'),
+        marks = NULL,
+        feedback = NULL,
+        graded_at = NULL
     `).run(submissionId, id, req.user!.userId, code || null, notes || null);
 
-    res.json({ message: 'Assignment submitted successfully.', submissionId });
+    const saved = db.prepare('SELECT id FROM submissions WHERE assignment_id = ? AND student_id = ?').get(id, req.user!.userId) as any;
+    res.json({ message: 'Assignment submitted successfully.', submissionId: saved.id });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to submit assignment.' });
   }
@@ -113,7 +149,7 @@ export function getSubmissions(req: AuthRequest, res: Response): void {
   const { id } = req.params;
 
   const assignment = db.prepare(`
-    SELECT a.*, c.teacher_id FROM assignments a JOIN classes c ON c.id = a.class_id WHERE a.id = ?
+    SELECT a.*, c.teacher_id, c.institute_id FROM assignments a JOIN classes c ON c.id = a.class_id WHERE a.id = ?
   `).get(id) as any;
 
   if (!assignment) {
@@ -121,7 +157,7 @@ export function getSubmissions(req: AuthRequest, res: Response): void {
     return;
   }
 
-  if (assignment.teacher_id !== req.user!.userId && req.user!.role !== 'admin') {
+  if (assignment.teacher_id !== req.user!.userId && (req.user!.role !== 'admin' || !req.user!.instituteId || assignment.institute_id !== req.user!.instituteId)) {
     res.status(403).json({ error: 'Access denied.' });
     return;
   }
@@ -144,13 +180,13 @@ export function gradeSubmission(req: AuthRequest, res: Response): void {
   const { id, sid } = req.params;
   const { marks, feedback } = req.body;
 
-  if (marks === undefined) {
-    res.status(400).json({ error: 'Marks are required.' });
+  if (typeof marks !== 'number' || !Number.isFinite(marks)) {
+    res.status(400).json({ error: 'A valid numeric score is required.' });
     return;
   }
 
   const assignment = db.prepare(`
-    SELECT a.max_marks, c.teacher_id FROM assignments a JOIN classes c ON c.id = a.class_id WHERE a.id = ?
+    SELECT a.max_marks, c.teacher_id, c.institute_id FROM assignments a JOIN classes c ON c.id = a.class_id WHERE a.id = ?
   `).get(id) as any;
 
   if (!assignment) {
@@ -158,7 +194,7 @@ export function gradeSubmission(req: AuthRequest, res: Response): void {
     return;
   }
 
-  if (assignment.teacher_id !== req.user!.userId) {
+  if (assignment.teacher_id !== req.user!.userId && (req.user!.role !== 'admin' || !req.user!.instituteId || assignment.institute_id !== req.user!.instituteId)) {
     res.status(403).json({ error: 'Access denied.' });
     return;
   }
@@ -167,11 +203,20 @@ export function gradeSubmission(req: AuthRequest, res: Response): void {
     res.status(400).json({ error: `Marks must be between 0 and ${assignment.max_marks}.` });
     return;
   }
+  if (feedback !== undefined && feedback !== null && (typeof feedback !== 'string' || feedback.length > 4000)) {
+    res.status(400).json({ error: 'Feedback must be 4000 characters or fewer.' });
+    return;
+  }
 
-  db.prepare(`
+  const result = db.prepare(`
     UPDATE submissions SET marks = ?, feedback = ?, status = 'graded', graded_at = datetime('now')
     WHERE id = ? AND assignment_id = ?
   `).run(marks, feedback || null, sid, id);
+
+  if (result.changes === 0) {
+    res.status(404).json({ error: 'Submission not found for this assignment.' });
+    return;
+  }
 
   res.json({ message: 'Submission graded successfully.' });
 }

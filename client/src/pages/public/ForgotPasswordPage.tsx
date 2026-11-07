@@ -3,14 +3,29 @@ import { Link } from 'react-router-dom';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { firebaseAuth } from '../../services/firebase';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) setSubmitted(true);
+    setError('');
+    setLoading(true);
+    try {
+      if (!firebaseAuth) throw new Error('Password reset is unavailable until Firebase Authentication is configured.');
+      await sendPasswordResetEmail(firebaseAuth, email.trim());
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.code === 'auth/user-not-found'
+        ? 'If an account exists for that email, a reset link will be sent.'
+        : err?.code === 'auth/invalid-email' ? 'Enter a valid email address.' : (err?.message || 'Could not send a reset email.'));
+      if (err?.code === 'auth/user-not-found') setSubmitted(true);
+    } finally { setLoading(false); }
   };
 
   return (
@@ -32,7 +47,7 @@ export const ForgotPasswordPage: React.FC = () => {
               </div>
               <h3 className="text-sm font-bold text-navy-900">Password Reset Email Dispatched</h3>
               <p className="text-xs text-brand-muted leading-relaxed">
-                We sent security instructions to <strong className="text-navy-900">{email}</strong>. Check your inbox and follow the secure link.
+                If an account exists for <strong className="text-navy-900">{email}</strong>, Firebase has sent a secure password reset link. Check your inbox and spam folder.
               </p>
               <Link
                 to="/login"
@@ -43,6 +58,7 @@ export const ForgotPasswordPage: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
               <p className="text-xs text-brand-muted leading-relaxed">
                 Enter your registered university email address to receive password reset instructions.
               </p>
@@ -55,8 +71,8 @@ export const ForgotPasswordPage: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <Button type="submit" variant="primary" size="md" className="w-full">
-                Send Reset Link
+              <Button type="submit" variant="primary" size="md" className="w-full" disabled={loading}>
+                {loading ? 'Sending…' : 'Send Reset Link'}
               </Button>
               <div className="text-center pt-2">
                 <Link to="/login" className="text-xs text-primary font-semibold hover:underline">

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { LogIn, Eye, EyeOff, Loader2, FlaskConical, GraduationCap, BookOpen, Shield, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoginFormData } from '../../types/auth';
+import { firebaseAuth } from '../../services/firebase';
 
 const DEMO_CREDS = [
   { label: 'Student', email: 'student@demo.lumio.app', password: 'student123', icon: GraduationCap, color: 'from-violet-500/20 to-violet-600/10 border-violet-500/30 hover:border-violet-400/60' },
@@ -104,7 +105,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-slate-700/50">
+          {!firebaseAuth && <div className="mt-6 pt-6 border-t border-slate-700/50">
             <p className="text-xs text-slate-500 text-center mb-3">Try Demo Accounts — click to auto-fill</p>
             <div className="grid grid-cols-3 gap-2">
               {DEMO_CREDS.map((cred) => {
@@ -122,7 +123,7 @@ export const LoginPage: React.FC = () => {
                 );
               })}
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Footer links */}

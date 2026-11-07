@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (authError?.code !== 'auth/email-already-in-use') throw authError;
           firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
         }
-        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: data.name, email: data.email });
+        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: data.name, email: data.email }).catch(() => {});
         let profile: UserProfile;
         try {
           const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data, password: undefined });

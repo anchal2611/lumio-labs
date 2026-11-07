@@ -65,8 +65,19 @@ export function listLabs(req: AuthRequest, res: Response): void {
 
   let labs: any[];
   if (user.role === 'teacher' || user.role === 'admin') {
-    let query = 'SELECT lm.*, u.name as teacher_name FROM lab_modules lm JOIN users u ON u.id = lm.teacher_id WHERE lm.teacher_id = ?';
-    const params: any[] = [user.userId];
+    let query = 'SELECT lm.*, u.name as teacher_name FROM lab_modules lm JOIN users u ON u.id = lm.teacher_id WHERE ';
+    const params: any[] = [];
+    if (user.role === 'admin') {
+      if (!user.instituteId) {
+        res.status(403).json({ error: 'Admin must be associated with an institute.' });
+        return;
+      }
+      query += 'u.institute_id = ?';
+      params.push(user.instituteId);
+    } else {
+      query += 'lm.teacher_id = ?';
+      params.push(user.userId);
+    }
     if (classId) {
       query += ' AND lm.class_id = ?';
       params.push(classId);
@@ -105,7 +116,7 @@ export function listLabs(req: AuthRequest, res: Response): void {
 export function getLab(req: AuthRequest, res: Response): void {
   const { id } = req.params;
   const lab = db.prepare(`
-    SELECT lm.*, u.name as teacher_name, u.email as teacher_email
+    SELECT lm.*, u.name as teacher_name, u.email as teacher_email, u.institute_id as teacher_institute_id
     FROM lab_modules lm
     JOIN users u ON u.id = lm.teacher_id
     WHERE lm.id = ?
@@ -129,6 +140,12 @@ export function getLab(req: AuthRequest, res: Response): void {
         return;
       }
     }
+  } else if (req.user!.role === 'teacher' && lab.teacher_id !== req.user!.userId) {
+    res.status(403).json({ error: 'You do not have access to this lab.' });
+    return;
+  } else if (req.user!.role === 'admin' && (!req.user!.instituteId || lab.teacher_institute_id !== req.user!.instituteId)) {
+    res.status(403).json({ error: 'You do not have access to this lab.' });
+    return;
   }
 
   let exercises: any[] = [];
@@ -149,6 +166,14 @@ export function updateLab(req: AuthRequest, res: Response): void {
   }
 
   const { title, description, category, difficulty, language, classId, exercises, isPublished } = req.body;
+  const nextClassId = classId === '' ? null : (classId ?? lab.class_id);
+  if (nextClassId && nextClassId !== lab.class_id) {
+    const cls = db.prepare('SELECT id FROM classes WHERE id = ? AND teacher_id = ?').get(nextClassId, req.user!.userId);
+    if (!cls) {
+      res.status(403).json({ error: 'You do not own the selected class.' });
+      return;
+    }
+  }
   const exercisesWithIds = exercises
     ? exercises.map((ex: any, i: number) => ({ id: ex.id || uuid(), order: ex.order || i + 1, ...ex }))
     : JSON.parse(lab.exercises || '[]');
@@ -162,7 +187,7 @@ export function updateLab(req: AuthRequest, res: Response): void {
     category || lab.category,
     difficulty || lab.difficulty,
     language || lab.language,
-    classId ?? lab.class_id,
+    nextClassId,
     JSON.stringify(exercisesWithIds),
     isPublished !== undefined ? (isPublished ? 1 : 0) : lab.is_published,
     id,
@@ -178,6 +203,11 @@ export function deleteLab(req: AuthRequest, res: Response): void {
   const lab = db.prepare('SELECT id FROM lab_modules WHERE id = ? AND teacher_id = ?').get(id, req.user!.userId);
   if (!lab) {
     res.status(404).json({ error: 'Lab not found or you do not own it.' });
+    return;
+  }
+  const linkedAssignment = db.prepare('SELECT id FROM assignments WHERE lab_module_id = ? LIMIT 1').get(id);
+  if (linkedAssignment) {
+    res.status(409).json({ error: 'This lab is linked to an assignment. Unpublish it instead of deleting it.' });
     return;
   }
   db.prepare('DELETE FROM lab_modules WHERE id = ?').run(id);

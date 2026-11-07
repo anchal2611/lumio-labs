@@ -1,8 +1,7 @@
 import { Server, Socket } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
-import { JWT_SECRET } from '../middleware/auth';
+import { verifySocketToken } from '../middleware/auth';
 
 interface RoomParticipant {
   socketId: string;
@@ -28,32 +27,31 @@ export function setupCollabSockets(io: Server): void {
     if (!token) {
       return next(new Error('Authentication required.'));
     }
-    try {
-      socket.data.authUser = jwt.verify(token, JWT_SECRET) as any;
-      next();
-    } catch {
-      next(new Error('Invalid or expired authentication token.'));
-    }
+    void verifySocketToken(token)
+      .then((authUser) => { socket.data.authUser = authUser; next(); })
+      .catch(() => next(new Error('Invalid or expired authentication token.')));
   });
 
   io.on('connection', (socket: Socket) => {
     const socketUser = socket.data.authUser;
     let currentRoomId: string | null = null;
     let currentUser: RoomParticipant | null = null;
+    let lastChatAt = 0;
     const isInRoom = (roomId: string) => Boolean(currentUser && currentRoomId === roomId);
 
     // ─── Join Room ───────────────────────────────────
-    socket.on('join_room', ({ roomId }: { roomId: string }) => {
-      if (typeof roomId !== 'string' || !roomId) return;
+    socket.on('join_room', ({ roomId }: { roomId: string }, acknowledge?: (result: { ok: boolean; error?: string }) => void) => {
+      const reject = (error: string) => { socket.emit('room_error', { error }); acknowledge?.({ ok: false, error }); };
+      if (typeof roomId !== 'string' || !roomId) { reject('Invalid session.'); return; }
       const account = db.prepare('SELECT id, name, role FROM users WHERE id = ? AND status = ?').get(socketUser.userId, 'active') as any;
       const session = db.prepare(`
-        SELECT cs.id, cs.host_id, cs.class_id, cs.type, cs.is_active, c.teacher_id
+        SELECT cs.id, cs.host_id, cs.class_id, cs.type, cs.is_active, c.teacher_id, c.institute_id
         FROM collab_sessions cs
         LEFT JOIN classes c ON c.id = cs.class_id
         WHERE cs.id = ?
       `).get(roomId) as any;
       if (!account || !session || !session.is_active) {
-        socket.emit('room_error', { error: 'This session is unavailable.' });
+        reject('This session is unavailable.');
         return;
       }
       const isHost = session.host_id === account.id;
@@ -61,9 +59,10 @@ export function setupCollabSockets(io: Server): void {
         ? Boolean(db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(session.class_id, account.id))
         : false;
       const canJoin = isHost || (account.role === 'student' && (!session.class_id || isEnrolled)) ||
-        (account.role === 'teacher' && (!session.class_id || session.teacher_id === account.id));
+        (account.role === 'teacher' && (!session.class_id || session.teacher_id === account.id)) ||
+        (account.role === 'admin' && Boolean(socketUser.instituteId && session.institute_id === socketUser.instituteId));
       if (!canJoin) {
-        socket.emit('room_error', { error: 'You do not have access to this session.' });
+        reject('You do not have access to this session.');
         return;
       }
 
@@ -94,6 +93,7 @@ export function setupCollabSockets(io: Server): void {
       }
 
       io.to(roomId).emit('room_participants_updated', activeRooms[roomId]);
+      acknowledge?.({ ok: true });
       socket.to(roomId).emit('user_joined_room', {
         userName: currentUser.userName,
         userRole: currentUser.userRole,
@@ -132,14 +132,24 @@ export function setupCollabSockets(io: Server): void {
     });
 
     // ─── Live Chat ────────────────────────────────────
-    socket.on('send_chat', ({ roomId, message }: { roomId: string; message: any }) => {
-      if (!isInRoom(roomId) || typeof message?.text !== 'string' || !message.text.trim()) return;
-      io.to(roomId).emit('chat_received', {
-        id: typeof message.id === 'string' ? message.id : uuid(),
+    socket.on('send_chat', ({ roomId, message }: { roomId: string; message: any }, acknowledge?: (result: { ok: boolean; error?: string; message?: any }) => void) => {
+      if (!isInRoom(roomId) || typeof message?.text !== 'string' || !message.text.trim()) {
+        acknowledge?.({ ok: false, error: 'Join the session before sending a message.' });
+        return;
+      }
+      if (Date.now() - lastChatAt < 300) {
+        acknowledge?.({ ok: false, error: 'Please wait a moment before sending another message.' });
+        return;
+      }
+      lastChatAt = Date.now();
+      const chatMessage = {
+        id: typeof message.id === 'string' ? message.id.slice(0, 80) : uuid(),
         senderName: currentUser?.userName,
         text: message.text.trim().slice(0, 5000),
         timestamp: new Date().toISOString(),
-      });
+      };
+      io.to(roomId).emit('chat_received', chatMessage);
+      acknowledge?.({ ok: true, message: chatMessage });
     });
 
     // ─── Teacher Broadcast (class sessions) ──────────

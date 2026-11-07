@@ -48,6 +48,10 @@ export function listClasses(req: AuthRequest, res: Response): void {
 
   let classes: any[];
   if (user.role === 'teacher' || user.role === 'admin') {
+    if (user.role === 'admin' && !user.instituteId) {
+      res.status(403).json({ error: 'Admin must be associated with an institute.' });
+      return;
+    }
     classes = db.prepare(`
       SELECT c.*, 
         (SELECT COUNT(*) FROM class_enrollments WHERE class_id = c.id) as student_count,
@@ -55,9 +59,9 @@ export function listClasses(req: AuthRequest, res: Response): void {
         u.name as teacher_name
       FROM classes c
       JOIN users u ON u.id = c.teacher_id
-      WHERE c.teacher_id = ?
+      WHERE ${user.role === 'admin' ? 'c.institute_id = ?' : 'c.teacher_id = ?'}
       ORDER BY c.created_at DESC
-    `).all(user.userId);
+    `).all(user.role === 'admin' ? user.instituteId : user.userId);
   } else {
     // Student: get enrolled classes
     classes = db.prepare(`
@@ -97,6 +101,9 @@ export function joinClass(req: AuthRequest, res: Response): void {
   }
 
   db.prepare('INSERT INTO class_enrollments (class_id, student_id) VALUES (?, ?)').run(cls.id, req.user!.userId);
+  if (cls.institute_id) {
+    db.prepare('UPDATE users SET institute_id = ? WHERE id = ? AND institute_id IS NULL').run(cls.institute_id, req.user!.userId);
+  }
 
   const teacher = db.prepare('SELECT name, email FROM users WHERE id = ?').get(cls.teacher_id) as any;
   res.json({
@@ -125,6 +132,9 @@ export function getClass(req: AuthRequest, res: Response): void {
   } else if (user.role === 'teacher' && cls.teacher_id !== user.userId) {
     res.status(403).json({ error: 'You do not have access to this class.' });
     return;
+  } else if (user.role === 'admin' && (!user.instituteId || cls.institute_id !== user.instituteId)) {
+    res.status(403).json({ error: 'You do not have access to this class.' });
+    return;
   }
 
   const teacher = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(cls.teacher_id);
@@ -146,6 +156,19 @@ export function getClass(req: AuthRequest, res: Response): void {
 // GET /api/classes/:id/students
 export function getClassStudents(req: AuthRequest, res: Response): void {
   const { id } = req.params;
+  const cls = db.prepare('SELECT id, teacher_id, institute_id FROM classes WHERE id = ?').get(id) as any;
+  if (!cls) {
+    res.status(404).json({ error: 'Class not found.' });
+    return;
+  }
+  if (req.user!.role === 'teacher' && cls.teacher_id !== req.user!.userId) {
+    res.status(403).json({ error: 'You do not have access to this class roster.' });
+    return;
+  }
+  if (req.user!.role === 'admin' && (!req.user!.instituteId || cls.institute_id !== req.user!.instituteId)) {
+    res.status(403).json({ error: 'You do not have access to this class roster.' });
+    return;
+  }
   const students = db.prepare(`
     SELECT u.id, u.name, u.email, sp.roll_number, sp.branch, sp.semester, ce.enrolled_at
     FROM class_enrollments ce

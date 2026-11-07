@@ -29,14 +29,20 @@ services:
         value: lumio-e3c95
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
+      - key: JUDGE0_API_KEY
+        sync: false
+      - key: JUDGE0_API_URL
+        value: https://judge0-ce.p.rapidapi.com
       - key: VITE_FIREBASE_API_KEY
-        sync: false
+        value: AIzaSyD6VJbejH09YUbBGwfmMWYn4i36fw0Vj4s
       - key: VITE_FIREBASE_AUTH_DOMAIN
-        sync: false
+        value: lumio-e3c95.firebaseapp.com
+      - key: VITE_FIREBASE_DATABASE_URL
+        value: https://lumio-e3c95-default-rtdb.asia-southeast1.firebasedatabase.app
       - key: VITE_FIREBASE_PROJECT_ID
         value: lumio-e3c95
       - key: VITE_FIREBASE_STORAGE_BUCKET
-        sync: false
+        value: lumio-e3c95.firebasestorage.app
       - key: VITE_FIREBASE_MESSAGING_SENDER_ID
         value: "959607549702"
       - key: VITE_FIREBASE_APP_ID

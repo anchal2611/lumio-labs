@@ -5,6 +5,7 @@ import { Users, MessageSquare, Play, Plus, X, Send, Loader2, Zap, FlaskConical, 
 import { apiDelete, apiGet, apiPost, getAuthToken } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { config } from '../../config/env';
+import { useToast } from '../../contexts/ToastContext';
 
 const LANGS = ['python', 'javascript', 'cpp', 'java', 'sql'];
 
@@ -20,6 +21,7 @@ const TAB_INFO = [
 
 export const CollabHub: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('peer');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export const CollabHub: React.FC = () => {
   const [output, setOutput] = useState('');
   const [running, setRunning] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [sendingChat, setSendingChat] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -72,7 +75,13 @@ export const CollabHub: React.FC = () => {
     if (!token) { setOutput('Sign in again to join this session.'); return; }
     const socket = io(config.socketUrl, { auth: { token }, transports: ['websocket', 'polling'] });
     socketRef.current = socket;
-    socket.on('connect', () => { setConnected(true); socket.emit('join_room', { roomId: session.id }); });
+    socket.on('connect', () => {
+      setConnected(false);
+      socket.emit('join_room', { roomId: session.id }, (result: { ok: boolean; error?: string }) => {
+        if (result?.ok) setConnected(true);
+        else { setConnected(false); setOutput(result?.error || 'Could not join this session.'); }
+      });
+    });
     socket.on('disconnect', () => setConnected(false));
     socket.on('connect_error', (err) => { setConnected(false); setOutput(err.message || 'Could not connect to this session.'); });
     socket.on('room_error', ({ error }: { error: string }) => { setOutput(error || 'Could not join this session.'); setConnected(false); });
@@ -83,6 +92,7 @@ export const CollabHub: React.FC = () => {
     socket.on('session_ended', () => {
       setOutput('The host ended this session.');
       disconnectSession();
+      toast.info('Session ended', 'The host has closed this collaboration session.');
       void fetchSessions();
     });
   };
@@ -108,19 +118,29 @@ export const CollabHub: React.FC = () => {
   };
 
   const sendChat = () => {
-    if (!chatInput.trim()) return;
-    const msg: ChatMessage = { id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`, senderName: user?.name || 'You', text: chatInput.trim(), timestamp: new Date().toISOString() };
-    socketRef.current?.emit('send_chat', { roomId: activeSession?.id, message: msg });
-    addChatMessage(msg);
-    setChatInput('');
+    const messageText = chatInput.trim();
+    const socket = socketRef.current;
+    if (!messageText || !activeSession || sendingChat) return;
+    if (!connected || !socket?.connected) { toast.error('Not connected', 'Wait for the live session to reconnect before sending.'); return; }
+    const msg: ChatMessage = { id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`, senderName: user?.name || 'You', text: messageText, timestamp: new Date().toISOString() };
+    setSendingChat(true);
+    socket.timeout(5000).emit('send_chat', { roomId: activeSession.id, message: msg }, (err: Error | null, result: { ok: boolean; error?: string; message?: ChatMessage }) => {
+      setSendingChat(false);
+      if (err || !result?.ok || !result.message) { toast.error('Message not sent', result?.error || 'Check your connection and try again.'); return; }
+      addChatMessage(result.message);
+      setChatInput((current) => current === messageText ? '' : current);
+    });
   };
 
   const runCode = async () => {
     if (!code.trim()) return;
     setRunning(true);
     try {
-      const data = await apiPost<{ stdout?: string; stderr?: string; exitCode?: number }>('/execute', { language: activeSession?.language || 'python', code });
-      const out = data.stdout || data.stderr || `Program finished without output (exit code ${data.exitCode ?? 0}).`;
+      const data = await apiPost<{ stdout?: string; stderr?: string; exitCode?: number; timeMs?: number; provider?: string }>('/execute', { language: activeSession?.language || 'python', code });
+      const sections = [data.stdout?.trimEnd(), data.stderr?.trimEnd()].filter(Boolean);
+      if (!sections.length) sections.push(`Program finished without output (exit code ${data.exitCode ?? 0}).`);
+      if (data.provider) sections.push(`Provider: ${data.provider}${data.timeMs !== undefined ? ` · ${data.timeMs} ms` : ''}`);
+      const out = sections.join('\n\n');
       setOutput(out);
       socketRef.current?.emit('share_output', { roomId: activeSession?.id, output: out });
     } catch (err) { setOutput(err instanceof Error ? err.message : 'Execution failed.'); }
@@ -134,8 +154,9 @@ export const CollabHub: React.FC = () => {
       await apiPost('/collab/sessions', { name: createForm.name, type: activeTab, language: createForm.language });
       setShowCreateModal(false);
       setCreateForm({ name: '', language: 'python' });
-      fetchSessions();
-    } catch { } finally { setCreating(false); }
+      await fetchSessions();
+      toast.success('Session created', 'Your session is now available to participants.');
+    } catch (err) { toast.error('Could not create session', err instanceof Error ? err.message : 'Please try again.'); } finally { setCreating(false); }
   };
 
   const monacoLang = (l: string) => l === 'cpp' ? 'cpp' : l;
@@ -214,8 +235,8 @@ export const CollabHub: React.FC = () => {
                 <div ref={chatEndRef} />
               </div>
               <div className="p-3 border-t border-slate-800 flex gap-2">
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Type message..." />
-                <button onClick={sendChat} className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"><Send className="w-4 h-4" /></button>
+                <input value={chatInput} disabled={!connected || sendingChat} onChange={e => setChatInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } }} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60" placeholder={connected ? 'Type message...' : 'Connecting…'} />
+                <button type="button" onClick={sendChat} disabled={!connected || sendingChat || !chatInput.trim()} aria-label="Send message" className="p-2 bg-blue-600 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 text-white rounded-lg transition-colors"><Send className="w-4 h-4" /></button>
               </div>
             </div>
           )}

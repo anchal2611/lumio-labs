@@ -115,7 +115,7 @@ export const AdminStudents: React.FC = () => {
                 <tr><td colSpan={6} className="px-5 py-12 text-center">
                   <UserRound className="mx-auto mb-2 h-6 w-6 text-slate-300" />
                   <p className="font-medium text-navy-900">{query ? 'No matching students' : 'No students registered yet'}</p>
-                  <p className="mt-1 text-sm text-brand-muted">{query ? 'Try a different search.' : 'Students who register with an approved institute email domain will appear here.'}</p>
+                  <p className="mt-1 text-sm text-brand-muted">{query ? 'Try a different search.' : 'Students who register with an approved email domain or join one of your classes will appear here.'}</p>
                 </td></tr>
               ) : filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-slate-50/70">

@@ -1,387 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  FlaskConical,
-  FileCode2,
-  Users2,
-  ClipboardList,
-  Sparkles,
-  ArrowRight,
-  Play,
-  Clock,
-  CheckCircle2,
-  Bell,
-  Code2,
-  BookOpen,
-} from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { apiGet } from '../../services/api';
+import { ArrowRight, BookOpen, ClipboardList, FlaskConical, Loader2, Users2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { LabCard } from '../../components/labs/LabCard';
-import {
-  MOCK_LABS,
-  MOCK_ASSIGNMENTS,
-  MOCK_COLLAB_ROOMS,
-  MOCK_ANNOUNCEMENTS,
-} from '../../services/mockData';
-import { useLabStore } from '../../store/useLabStore';
-import { apiGet } from '../../services/api';
 
-interface RealLabItem {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  language: string;
-  teacher_name?: string;
-  exercises?: any[];
-}
+type Lab = { id: string; title: string; description?: string; language: string; exercises?: unknown[]; teacher_name?: string };
+type Assignment = { id: string; title: string; description?: string; class_name: string; lab_title: string; due_date?: string | null; submission_status?: string | null; marks?: number | null; max_marks: number };
+type Session = { id: string; name: string; language: string; host_name: string; type: string };
+type ClassItem = { id: string; name: string };
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { savedExperiments, setActiveLab } = useLabStore();
-  const [classLabs, setClassLabs] = useState<RealLabItem[]>([]);
-  const [loadingLabs, setLoadingLabs] = useState(false);
+  const [labs, setLabs] = useState<Lab[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [classCount, setClassCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Fetch assigned labs from student's enrolled classes
-    apiGet<{ labs: RealLabItem[] }>('/labs')
-      .then((data) => {
-        if (data.labs && Array.isArray(data.labs)) {
-          setClassLabs(data.labs);
-        }
-      })
-      .catch(() => {});
+    let alive = true;
+    Promise.allSettled([
+      apiGet<{ labs: Lab[] }>('/labs'),
+      apiGet<{ assignments: Assignment[] }>('/assignments'),
+      apiGet<{ sessions: Session[] }>('/collab/sessions'),
+      apiGet<{ classes: ClassItem[] }>('/classes'),
+    ]).then((results) => {
+      if (!alive) return;
+      const errors: string[] = [];
+      if (results[0].status === 'fulfilled') setLabs(results[0].value.labs || []); else errors.push(results[0].reason?.message || 'Labs unavailable');
+      if (results[1].status === 'fulfilled') setAssignments(results[1].value.assignments || []); else errors.push(results[1].reason?.message || 'Assignments unavailable');
+      if (results[2].status === 'fulfilled') setSessions(results[2].value.sessions || []); else errors.push(results[2].reason?.message || 'Sessions unavailable');
+      if (results[3].status === 'fulfilled') setClassCount(results[3].value.classes?.length || 0); else errors.push(results[3].reason?.message || 'Classes unavailable');
+      if (errors.length) setError(errors.join(' · '));
+    }).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
   }, []);
 
-  const activeAssignments = MOCK_ASSIGNMENTS.filter((a) => a.status === 'published');
-
-  return (
-    <div className="space-y-8">
-      {/* A. Welcome Banner */}
-      <div className="bg-gradient-to-r from-navy-900 via-navy-800 to-primary-dark rounded-2xl p-6 sm:p-8 text-white shadow-floating relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-brand-aqua text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Semester {user?.semester || 4} • {user?.department || 'Computer Science'}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Welcome back, {user?.name || 'Student'}!
-          </h1>
-          <p className="mt-1.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Ready to experiment? Your compiler sandbox, interactive SQL console, and virtual IoT breadboards are ready.
-            {classLabs.length > 0 ? (
-              <> You have <strong className="text-brand-aqua">{classLabs.length} assigned classroom lab(s)</strong> waiting.</>
-            ) : null}
-          </p>
-
-          <div className="mt-5 flex items-center gap-3 flex-wrap">
-            <Button
-              size="sm"
-              variant="accent"
-              leftIcon={<Play className="w-3.5 h-3.5 fill-white" />}
-              onClick={() => {
-                if (classLabs.length > 0) {
-                  navigate(`/student/labs/${classLabs[0].id}`);
-                } else {
-                  navigate(`/student/labs/lab-python`);
-                }
-              }}
-            >
-              {classLabs.length > 0 ? `Open: ${classLabs[0].title}` : 'Launch Python Lab'}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
-              leftIcon={<BookOpen className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/student/classes')}
-            >
-              My Classes
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
-              leftIcon={<Users2 className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/student/collaboration')}
-            >
-              Study Room
-            </Button>
-          </div>
-        </div>
-
-        {/* User Cardlet */}
-        <div className="relative z-10 hidden lg:flex flex-col items-center p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-center min-w-[200px]">
-          <img
-            src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-            alt={user?.name}
-            className="w-16 h-16 rounded-full object-cover ring-2 ring-brand-aqua"
-          />
-          <h4 className="text-sm font-bold mt-2">{user?.name}</h4>
-          <span className="text-[11px] text-brand-aqua font-mono">{user?.rollNumber || 'LUMIO Scholar'}</span>
-          <Badge variant="aqua" size="sm" className="mt-2">
-            Active Scholar
-          </Badge>
-        </div>
+  const pendingAssignments = assignments.filter((item) => item.submission_status !== 'graded');
+  return <div className="space-y-7">
+    <section className="flex flex-col gap-5 rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-primary-dark p-6 text-white shadow-floating sm:p-8 md:flex-row md:items-center md:justify-between">
+      <div><Badge variant="aqua" size="sm">{user?.department || 'Student workspace'}</Badge><h1 className="mt-3 text-2xl font-bold sm:text-3xl">Welcome, {user?.name || 'Student'}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Your enrolled labs, coursework and active collaboration sessions.</p>
+        <div className="mt-5 flex flex-wrap gap-3"><Button size="sm" variant="accent" onClick={() => navigate(labs[0] ? `/student/labs/${labs[0].id}` : '/student/classes')}>{labs[0] ? 'Open a lab' : 'Browse my classes'}</Button><Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => navigate('/student/collaboration')}>Study room</Button></div>
       </div>
+      <div className="hidden min-w-40 text-right md:block"><p className="text-3xl font-bold">{user?.semester ? `S${user.semester}` : 'LUMIO'}</p><p className="text-xs text-slate-300">{user?.rollNumber || 'Learning workspace'}</p></div>
+    </section>
 
-      {/* B. Key Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
-              <FlaskConical className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-brand-muted font-medium">Assigned Class Labs</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{classLabs.length} Available</h3>
-            </div>
-          </CardContent>
-        </Card>
+    {error && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Some dashboard data could not be loaded: {error}</div>}
+    <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {[{ label: 'Available labs', value: labs.length, icon: FlaskConical }, { label: 'Pending coursework', value: pendingAssignments.length, icon: ClipboardList }, { label: 'Active sessions', value: sessions.length, icon: Users2 }, { label: 'My classes', value: classCount, icon: BookOpen }].map(({ label, value, icon: Icon }) => <Card key={label}><CardContent className="flex items-center gap-3 p-4"><Icon className="h-5 w-5 shrink-0 text-primary" /><div><p className="text-xs text-brand-muted">{label}</p><p className="font-semibold text-navy-900">{value}</p></div></CardContent></Card>)}
+    </section>
 
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-              <FileCode2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-brand-muted font-medium">Virtual Laboratories</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{MOCK_LABS.length} Workspaces</h3>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <Card><CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>My lab modules</CardTitle><p className="mt-1 text-sm text-brand-muted">Published labs from your enrolled classes.</p></div><Button size="sm" variant="outline" rightIcon={<ArrowRight className="h-3.5 w-3.5" />} onClick={() => navigate('/student/labs')}>All labs</Button></CardHeader><CardContent className="space-y-3">
+        {loading ? <p className="py-6 text-center text-sm text-brand-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading labs…</p> : labs.length === 0 ? <div className="py-6 text-center"><p className="font-medium text-navy-900">No assigned labs yet</p><p className="mt-1 text-sm text-brand-muted">Join a class or ask your teacher to publish a lab.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => navigate('/student/classes')}>View classes</Button></div> : labs.slice(0, 5).map((lab) => <button key={lab.id} onClick={() => navigate(`/student/labs/${lab.id}`)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 text-left transition hover:border-primary/40 hover:bg-slate-50"><span><span className="block font-medium text-navy-900">{lab.title}</span><span className="mt-1 block text-xs text-brand-muted">{lab.language.toUpperCase()} · {lab.exercises?.length || 0} exercises · {lab.teacher_name || 'Course faculty'}</span></span><ArrowRight className="h-4 w-4 shrink-0 text-primary" /></button>)}
+      </CardContent></Card>
 
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
-              <Users2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-brand-muted font-medium">Active Collaborations</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">Live Sync Enabled</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-4 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-brand-muted font-medium">Coursework & Tasks</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{activeAssignments.length} Practicals</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* C. Class Assigned Labs (if any exist in database) */}
-      {classLabs.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-navy-900 tracking-tight flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-brand-aqua" />
-                Assigned Classroom Laboratories
-              </h2>
-              <p className="text-xs text-brand-muted">
-                Official laboratory modules assigned by your faculty for coursework and evaluation
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/student/classes')}
-            >
-              View Classes
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classLabs.map((lab) => (
-              <Card
-                key={lab.id}
-                hoverable
-                onClick={() => navigate(`/student/labs/${lab.id}`)}
-                className="border border-primary/20 bg-primary/5 cursor-pointer"
-              >
-                <CardContent className="p-5 flex flex-col justify-between h-full">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <Badge variant="primary" size="sm" className="capitalize">
-                        {lab.language}
-                      </Badge>
-                      <Badge variant="aqua" size="sm">
-                        Class Lab
-                      </Badge>
-                    </div>
-                    <h3 className="text-base font-bold text-navy-900">{lab.title}</h3>
-                    <p className="text-xs text-brand-muted mt-1 line-clamp-2">{lab.description}</p>
-                    <p className="text-[11px] text-slate-500 mt-3 font-medium">
-                      Instructor: <span className="text-navy-900">{lab.teacher_name || 'Faculty'}</span>
-                    </p>
-                  </div>
-                  <div className="pt-4 mt-4 border-t border-slate-200/60 flex items-center justify-between">
-                    <span className="text-xs text-brand-muted font-medium">
-                      {lab.exercises?.length || 0} Exercises
-                    </span>
-                    <Button size="sm" variant="primary">
-                      Launch Lab →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Main Grid: University Laboratories & Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          {/* University Laboratories */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-bold text-navy-900 tracking-tight">
-                  University Laboratories & Workspaces
-                </h2>
-                <p className="text-xs text-brand-muted">
-                  Interactive workstations with compiler engines, SQL databases, and hardware simulators
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-                onClick={() => navigate('/student/labs')}
-              >
-                View All Labs
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {MOCK_LABS.slice(0, 4).map((lab) => (
-                <LabCard key={lab.id} lab={lab} />
-              ))}
-            </div>
-          </div>
-
-          {/* Active Collaboration Sessions */}
-          <Card className="border border-slate-200/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle>Active Peer Collaboration Rooms</CardTitle>
-                <p className="text-xs text-brand-muted mt-0.5">
-                  Live collaborative coding sessions happening in your department right now
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => navigate('/student/collaboration')}
-              >
-                Join or Create
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {MOCK_COLLAB_ROOMS.map((room) => (
-                <div
-                  key={room.id}
-                  onClick={() => navigate('/student/collaboration')}
-                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-navy-900">{room.title}</span>
-                      <Badge variant="primary" size="sm" className="uppercase font-mono">
-                        {room.language}
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-brand-muted mt-0.5">
-                      Hosted by {room.hostName} • {room.participants.length} active peer(s)
-                    </p>
-                  </div>
-                  <Button size="sm" variant="accent">
-                    Enter Session
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Sidebar Feeds */}
-        <div className="space-y-6">
-          {/* Announcements */}
-          <Card className="border border-slate-200/80">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">Department Announcements</CardTitle>
-              <Bell className="w-4 h-4 text-brand-muted" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {MOCK_ANNOUNCEMENTS.map((ann) => (
-                <div key={ann.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/70">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                      {ann.authorRole}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(ann.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-bold text-navy-900 mt-1">{ann.title}</h4>
-                  <p className="text-[11px] text-brand-muted mt-1 leading-relaxed">
-                    {ann.content}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Quick Shortcuts */}
-          <Card className="border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Quick Lab Shortcuts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs font-medium"
-                leftIcon={<Code2 className="w-3.5 h-3.5 text-primary" />}
-                onClick={() => navigate('/student/labs/lab-python')}
-              >
-                Python Algorithms Sandbox
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs font-medium"
-                leftIcon={<FileCode2 className="w-3.5 h-3.5 text-teal-600" />}
-                onClick={() => navigate('/student/labs/lab-sql')}
-              >
-                SQL Relational Workbench
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs font-medium"
-                leftIcon={<FlaskConical className="w-3.5 h-3.5 text-amber-500" />}
-                onClick={() => navigate('/student/labs/lab-iot')}
-              >
-                ESP32 IoT Breadboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card><CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Coursework</CardTitle><p className="mt-1 text-sm text-brand-muted">Submission and grading status.</p></div><Button size="sm" variant="outline" onClick={() => navigate('/student/assignments')}>All assignments</Button></CardHeader><CardContent className="space-y-3">
+        {loading ? <p className="py-6 text-center text-sm text-brand-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading coursework…</p> : assignments.length === 0 ? <p className="py-8 text-center text-sm text-brand-muted">No assignments from your classes yet.</p> : assignments.slice(0, 5).map((assignment) => <div key={assignment.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4"><span><span className="block font-medium text-navy-900">{assignment.title}</span><span className="mt-1 block text-xs text-brand-muted">{assignment.class_name} · {assignment.lab_title}</span></span><Badge variant={assignment.submission_status === 'graded' ? 'success' : assignment.submission_status ? 'warning' : 'neutral'} size="sm">{assignment.submission_status || 'Not submitted'}</Badge></div>)}
+      </CardContent></Card>
     </div>
-  );
+  </div>;
 };

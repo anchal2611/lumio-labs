@@ -30,6 +30,10 @@ export async function register(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: 'Name and email are required.' });
       return;
     }
+    if (role && role !== 'student') {
+      res.status(403).json({ error: 'Teacher and administrator accounts must be created through institute administration.' });
+      return;
+    }
     if (firebaseUser && firebaseUser.email.toLowerCase() !== String(email).toLowerCase()) {
       res.status(403).json({ error: 'Firebase account email does not match registration email.' });
       return;
@@ -44,12 +48,9 @@ export async function register(req: Request, res: Response): Promise<void> {
     // Auto-detect institute from email domain
     const instituteId = getInstituteIdByEmailDomain(email);
 
-    // Role logic: 
-    // - If institute domain matches → role forced to 'student'
-    // - Else use provided role (student/teacher as independent)
-    // - Admin role can only be set via institute registration
-    let finalRole = firebaseUser ? (role === 'teacher' ? 'teacher' : 'student') : (role || 'student');
-    if (instituteId && finalRole === 'admin') finalRole = 'student';
+    // Public sign-up must not grant elevated roles. Faculty are provisioned by
+    // an institute administrator; institute admins use institute registration.
+    const finalRole = 'student';
 
     const passwordHash = firebaseUser ? 'firebase-managed' : await bcrypt.hash(password, 10);
     const userId = firebaseUser?.uid || uuid();

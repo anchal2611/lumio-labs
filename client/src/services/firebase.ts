@@ -1,7 +1,5 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
-import { Firestore, doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
-import { FirebaseStorage, getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { config } from '../config/env';
 
 const firebaseConfig = config.firebase;
@@ -19,10 +17,6 @@ export const firebaseApp: FirebaseApp | null = firebaseConfig.isConfigured
   : null;
 
 export const firebaseAuth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
-export const firestore: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
-export const firebaseStorage: FirebaseStorage | null = firebaseApp && firebaseConfig.storageBucket
-  ? getStorage(firebaseApp)
-  : null;
 
 export async function saveFirebaseUserProfile(profile: {
   uid: string;
@@ -30,7 +24,9 @@ export async function saveFirebaseUserProfile(profile: {
   email: string;
   avatar?: string;
 }): Promise<void> {
-  if (!firestore) throw new Error('Firebase is not configured.');
+  if (!firebaseApp) throw new Error('Firebase is not configured.');
+  const { doc, getFirestore, serverTimestamp, setDoc } = await import('firebase/firestore');
+  const firestore = getFirestore(firebaseApp);
   await setDoc(doc(firestore, 'users', profile.uid), {
     name: profile.name,
     email: profile.email,
@@ -40,7 +36,9 @@ export async function saveFirebaseUserProfile(profile: {
 }
 
 export async function uploadFirebaseAvatar(uid: string, file: File): Promise<string> {
-  if (!firebaseStorage) throw new Error('Firebase Storage is not configured.');
+  if (!firebaseApp || !firebaseConfig.storageBucket) throw new Error('Firebase Storage is not configured.');
+  const { getDownloadURL, getStorage, ref, uploadBytes } = await import('firebase/storage');
+  const firebaseStorage = getStorage(firebaseApp);
   if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
     throw new Error('Choose an image smaller than 5 MB.');
   }

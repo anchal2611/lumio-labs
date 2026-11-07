@@ -1,125 +1,44 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Search, Plus, CheckCircle, Ban, Trash2, Edit } from 'lucide-react';
-import { MOCK_STUDENTS_LIST, DEMO_USERS } from '../../services/mockData';
-import { Card, CardContent } from '../../components/ui/Card';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Search, ShieldCheck, Loader2 } from 'lucide-react';
+import { apiGet, apiPatch } from '../../services/api';
+import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useToast } from '../../contexts/ToastContext';
+
+type InstituteUser = { id: string; name: string; email: string; role: 'student' | 'teacher' | 'admin'; status: 'active' | 'inactive' | 'suspended'; avatar?: string; created_at: string };
 
 export const AdminUsers: React.FC = () => {
-  const [users, setUsers] = useState([
-    DEMO_USERS.student,
-    DEMO_USERS.teacher,
-    DEMO_USERS.admin,
-    ...MOCK_STUDENTS_LIST.slice(1),
-  ]);
+  const [users, setUsers] = useState<InstituteUser[]>([]);
   const [search, setSearch] = useState('');
-  const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const loadUsers = useCallback(async () => {
+    setLoading(true); setError('');
+    try { const data = await apiGet<{ users: InstituteUser[] }>('/institutes/me/users?limit=100'); setUsers(data.users || []); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not load institute users.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void loadUsers(); }, [loadUsers]);
+  const filtered = useMemo(() => { const q = search.trim().toLowerCase(); return users.filter((u) => !q || `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(q)); }, [users, search]);
 
-  const handleToggleVerify = (id: string) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, isVerified: !u.isVerified } : u))
-    );
-    toast.success('User Updated', 'Verification status modified.');
+  const toggleStatus = async (user: InstituteUser) => {
+    if (user.role === 'admin') return;
+    const status = user.status === 'active' ? 'suspended' : 'active';
+    setSavingId(user.id); setError('');
+    try { await apiPatch(`/admin/users/${user.id}/status`, { status }); setUsers((current) => current.map((item) => item.id === user.id ? { ...item, status } : item)); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not update user.'); }
+    finally { setSavingId(null); }
   };
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck className="w-5 h-5 text-amber-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-              Institutional User Directory
-            </h1>
-          </div>
-          <p className="text-xs text-brand-muted">
-            Manage university student accounts, faculty verification credentials, and administrative roles
-          </p>
-        </div>
-
-        <div className="w-full sm:w-64">
-          <Input
-            placeholder="Search users..."
-            leftIcon={<Search className="w-4 h-4" />}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Card className="border border-slate-200/80">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-100/70 text-navy-900 uppercase text-[10px] font-bold border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">User</th>
-                <th className="p-3.5">Role</th>
-                <th className="p-3.5">Department</th>
-                <th className="p-3.5">Joined Date</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                        alt={u.name}
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                      <div>
-                        <h4 className="font-bold text-navy-900">{u.name}</h4>
-                        <p className="text-[10px] text-slate-400 font-mono">{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <Badge
-                      variant={u.role === 'admin' ? 'warning' : u.role === 'teacher' ? 'aqua' : 'primary'}
-                      size="sm"
-                      className="capitalize"
-                    >
-                      {u.role}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-slate-600 font-medium">{u.department}</td>
-                  <td className="p-3.5 text-slate-400">
-                    {new Date(u.joinedAt).toLocaleDateString()}
-                  </td>
-                  <td className="p-3.5">
-                    <button
-                      onClick={() => handleToggleVerify(u.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
-                        u.isVerified
-                          ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                          : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                      }`}
-                    >
-                      {u.isVerified ? 'Verified' : 'Pending Verification'}
-                    </button>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <Button size="sm" variant="ghost" className="text-xs">
-                      Edit
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
+  return <div className="space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-1 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-amber-600" /><h1 className="text-xl font-bold text-navy-900 sm:text-2xl">Institute user directory</h1></div><p className="text-sm text-brand-muted">Real student and faculty accounts for your institute.</p></div><div className="w-full sm:w-72"><Input placeholder="Search users…" leftIcon={<Search className="h-4 w-4" />} value={search} onChange={(e) => setSearch(e.target.value)} /></div></header>
+    <Card className="overflow-hidden">{error && <div role="alert" className="m-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">User</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Joined</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-slate-100">
+        {loading ? <tr><td colSpan={5} className="px-5 py-12 text-center text-brand-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading users…</td></tr>
+          : filtered.length === 0 ? <tr><td colSpan={5} className="px-5 py-12 text-center text-brand-muted">{search ? 'No users match your search.' : 'No users have joined this institute yet.'}</td></tr>
+          : filtered.map((user) => <tr key={user.id}><td className="px-5 py-3.5"><p className="font-medium text-navy-900">{user.name}</p><p className="text-xs text-brand-muted">{user.email}</p></td><td className="px-5 py-3.5"><Badge variant={user.role === 'admin' ? 'warning' : user.role === 'teacher' ? 'aqua' : 'primary'} size="sm" className="capitalize">{user.role}</Badge></td><td className="px-5 py-3.5">{new Date(user.created_at).toLocaleDateString()}</td><td className="px-5 py-3.5"><Badge variant={user.status === 'active' ? 'success' : 'warning'} size="sm">{user.status}</Badge></td><td className="px-5 py-3.5 text-right"><Button size="sm" variant="outline" disabled={user.role === 'admin' || savingId === user.id} onClick={() => void toggleStatus(user)}>{savingId === user.id ? 'Saving…' : user.status === 'active' ? 'Suspend' : 'Reactivate'}</Button></td></tr>)}
+      </tbody></table></div>
+    </Card>
+  </div>;
 };

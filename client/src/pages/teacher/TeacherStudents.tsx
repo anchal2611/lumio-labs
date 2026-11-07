@@ -1,103 +1,40 @@
-import React, { useState } from 'react';
-import { GraduationCap, Search, Mail, ExternalLink, Award, CheckCircle2 } from 'lucide-react';
-import { MOCK_STUDENTS_LIST } from '../../services/mockData';
-import { Card, CardContent } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, GraduationCap, Loader2, Search } from 'lucide-react';
+import { apiGet } from '../../services/api';
+import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 
+type ClassItem = { id: string; name: string };
+type Student = { id: string; name: string; email: string; roll_number?: string | null; branch?: string | null; semester?: number | null };
+
 export const TeacherStudents: React.FC = () => {
+  const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { classes } = await apiGet<{ classes: ClassItem[] }>('/classes');
+        const rosters = await Promise.all((classes || []).map((cls) => apiGet<{ students: Student[] }>(`/classes/${cls.id}/students`)));
+        const unique = new Map<string, Student>();
+        rosters.flatMap((roster) => roster.students || []).forEach((student) => unique.set(student.id, student));
+        if (alive) setStudents([...unique.values()]);
+      } catch (err) { if (alive) setError(err instanceof Error ? err.message : 'Could not load students.'); }
+      finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
+  const filtered = useMemo(() => { const q = search.trim().toLowerCase(); return students.filter((s) => !q || `${s.name} ${s.email} ${s.roll_number || ''}`.toLowerCase().includes(q)); }, [students, search]);
 
-  const filtered = MOCK_STUDENTS_LIST.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase()) ||
-      (s.rollNumber && s.rollNumber.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <GraduationCap className="w-5 h-5 text-teal-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-              Assigned Students Directory
-            </h1>
-          </div>
-          <p className="text-xs text-brand-muted">
-            Track student lab attendance, experiment milestones, and individual academic portfolios
-          </p>
-        </div>
-
-        <div className="w-full sm:w-64">
-          <Input
-            placeholder="Search student or roll no..."
-            leftIcon={<Search className="w-4 h-4" />}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Card className="border border-slate-200/80">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-100/70 text-navy-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">Student</th>
-                <th className="p-3.5">Roll Number</th>
-                <th className="p-3.5">Branch / Program</th>
-                <th className="p-3.5">Semester</th>
-                <th className="p-3.5">Submission Rate</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={s.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                        alt={s.name}
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                      <div>
-                        <h4 className="font-bold text-navy-900">{s.name}</h4>
-                        <p className="text-[10px] text-slate-400 font-mono">{s.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-mono text-slate-700">{s.rollNumber || 'CS-2024-042'}</td>
-                  <td className="p-3.5 text-slate-600 font-medium">{s.branch || 'Software Eng'}</td>
-                  <td className="p-3.5 font-medium text-navy-900">Sem {s.semester || 4}</td>
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div className="bg-teal-600 h-full w-[90%]" />
-                      </div>
-                      <span className="font-semibold text-teal-700 text-[11px]">90%</span>
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <Badge variant="success" size="sm">
-                      Active
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <Button size="sm" variant="outline" className="text-xs">
-                      View Progress
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
+  return <div className="space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-1 flex items-center gap-2"><GraduationCap className="h-5 w-5 text-teal-600" /><h1 className="text-xl font-bold text-navy-900 sm:text-2xl">My class students</h1></div><p className="text-sm text-brand-muted">Students enrolled in your classes.</p></div><label className="relative block w-full sm:w-72"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search students…" className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary" /></label></header>
+    <Card className="overflow-hidden">{error && <div role="alert" className="m-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+      <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Student</th><th className="px-5 py-3">Roll number</th><th className="px-5 py-3">Program</th><th className="px-5 py-3">Semester</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">
+        {loading ? <tr><td colSpan={5} className="px-5 py-12 text-center text-brand-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading students…</td></tr>
+          : filtered.length === 0 ? <tr><td colSpan={5} className="px-5 py-12 text-center text-brand-muted">{search ? 'No students match your search.' : 'No students are enrolled in your classes yet.'}</td></tr>
+          : filtered.map((student) => <tr key={student.id}><td className="px-5 py-3.5"><p className="font-medium text-navy-900">{student.name}</p><p className="text-xs text-brand-muted">{student.email}</p></td><td className="px-5 py-3.5">{student.roll_number || '—'}</td><td className="px-5 py-3.5">{student.branch || '—'}</td><td className="px-5 py-3.5">{student.semester ? `Semester ${student.semester}` : '—'}</td><td className="px-5 py-3.5"><Badge variant="success" size="sm">Enrolled</Badge></td></tr>)}
+      </tbody></table></div>
+    </Card>
+  </div>;
 };

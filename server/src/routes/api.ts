@@ -22,16 +22,21 @@ import { createAssignment, listAssignments, submitAssignment, getSubmissions, gr
 
 // Collab
 import { createSession, listSessions, getSession, endSession } from '../controllers/collabController';
+import { hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
 
 export const apiRouter = Router();
 
 // ─── Health ──────────────────────────────────────────
 apiRouter.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'LUMIO Platform API v2', timestamp: new Date().toISOString(), version: '2.0.0' });
+  res.json({
+    status: 'ok', service: 'LUMIO Platform API v2', timestamp: new Date().toISOString(), version: '2.0.0',
+    firebaseAdminConfigured: hasFirebaseAdminCredentials,
+    codeExecutionConfigured: Boolean(process.env.JUDGE0_API_KEY),
+  });
 });
 
 // ─── Code Execution ──────────────────────────────────
-apiRouter.post('/execute', verifyToken, requireRole(['student', 'teacher']), executeCodeHandler as any);
+apiRouter.post('/execute', verifyToken, requireRole(['student', 'teacher', 'admin']), executeCodeHandler as any);
 
 // ─── Auth ─────────────────────────────────────────────
 apiRouter.post('/auth/register', verifyFirebaseTokenWhenPresent, register as any);
@@ -61,7 +66,7 @@ apiRouter.post('/classes', verifyToken, requireRole(['teacher']), createClass as
 apiRouter.get('/classes', verifyToken, listClasses as any);
 apiRouter.post('/classes/join', verifyToken, requireRole(['student']), joinClass as any);
 apiRouter.get('/classes/:id', verifyToken, getClass as any);
-apiRouter.get('/classes/:id/students', verifyToken, getClassStudents as any);
+apiRouter.get('/classes/:id/students', verifyToken, requireRole(['teacher', 'admin']), getClassStudents as any);
 apiRouter.delete('/classes/:id', verifyToken, requireRole(['teacher']), deleteClass as any);
 apiRouter.patch('/classes/:id/regenerate-code', verifyToken, requireRole(['teacher']), regenerateCode as any);
 
@@ -77,7 +82,7 @@ apiRouter.post('/assignments', verifyToken, requireRole(['teacher']), createAssi
 apiRouter.get('/assignments', verifyToken, listAssignments as any);
 apiRouter.post('/assignments/:id/submit', verifyToken, requireRole(['student']), submitAssignment as any);
 apiRouter.get('/assignments/:id/submissions', verifyToken, requireRole(['teacher', 'admin']), getSubmissions as any);
-apiRouter.put('/assignments/:id/submissions/:sid/grade', verifyToken, requireRole(['teacher']), gradeSubmission as any);
+apiRouter.put('/assignments/:id/submissions/:sid/grade', verifyToken, requireRole(['teacher', 'admin']), gradeSubmission as any);
 
 // ─── Collab ───────────────────────────────────────────
 apiRouter.post('/collab/sessions', verifyToken, createSession as any);

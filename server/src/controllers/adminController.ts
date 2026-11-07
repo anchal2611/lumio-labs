@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
+import { firebaseAdminAuth, hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
 
 // POST /api/admin/teachers — create teacher account
 export async function createTeacher(req: AuthRequest, res: Response): Promise<void> {
@@ -26,18 +27,46 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
 
     // Generate temporary password
     const tempPassword = `Lumio@${Math.floor(100000 + Math.random() * 900000)}`;
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
-    const teacherId = uuid();
+    if (process.env.NODE_ENV === 'production' && !hasFirebaseAdminCredentials) {
+      res.status(503).json({ error: 'Teacher account provisioning requires FIREBASE_SERVICE_ACCOUNT_JSON in the server environment.' });
+      return;
+    }
 
-    db.prepare(`
-      INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
-      VALUES (?, ?, ?, ?, 'teacher', ?, 1, 'active')
-    `).run(teacherId, name.trim(), email.toLowerCase(), passwordHash, req.user.instituteId);
+    let teacherId = uuid();
+    let firebaseUserCreated = false;
+    if (hasFirebaseAdminCredentials) {
+      try {
+        const firebaseUser = await firebaseAdminAuth.createUser({
+          email: email.toLowerCase(), password: tempPassword, displayName: name.trim(), emailVerified: true,
+        });
+        teacherId = firebaseUser.uid;
+        firebaseUserCreated = true;
+      } catch (err: any) {
+        if (err?.code === 'auth/email-already-exists') {
+          res.status(409).json({ error: 'A Firebase account with this email already exists.' });
+          return;
+        }
+        throw err;
+      }
+    }
 
-    db.prepare(`
-      INSERT INTO teacher_profiles (user_id, designation, department, employee_id)
-      VALUES (?, ?, ?, ?)
-    `).run(teacherId, designation || null, department || null, employeeId || null);
+    try {
+      const passwordHash = hasFirebaseAdminCredentials ? 'firebase-managed' : await bcrypt.hash(tempPassword, 10);
+      db.transaction(() => {
+        db.prepare(`
+          INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
+          VALUES (?, ?, ?, ?, 'teacher', ?, 1, 'active')
+        `).run(teacherId, name.trim(), email.toLowerCase(), passwordHash, req.user!.instituteId);
+
+        db.prepare(`
+          INSERT INTO teacher_profiles (user_id, designation, department, employee_id)
+          VALUES (?, ?, ?, ?)
+        `).run(teacherId, designation || null, department || null, employeeId || null);
+      })();
+    } catch (err) {
+      if (firebaseUserCreated) await firebaseAdminAuth.deleteUser(teacherId).catch(() => {});
+      throw err;
+    }
 
     res.status(201).json({
       message: 'Teacher account created.',
@@ -82,9 +111,14 @@ export function getStudents(req: AuthRequest, res: Response): void {
            sp.roll_number, sp.branch, sp.semester, sp.department
     FROM users u
     LEFT JOIN student_profiles sp ON sp.user_id = u.id
-    WHERE u.institute_id = ? AND u.role = 'student'
+    WHERE u.role = 'student' AND (
+      u.institute_id = ? OR (u.institute_id IS NULL AND EXISTS (
+        SELECT 1 FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id
+        WHERE ce.student_id = u.id AND c.institute_id = ?
+      ))
+    )
     ORDER BY u.created_at DESC
-  `).all(req.user.instituteId);
+  `).all(req.user.instituteId, req.user.instituteId);
 
   res.json({ students });
 }
@@ -105,7 +139,12 @@ export function updateUserStatus(req: AuthRequest, res: Response): void {
   }
 
   // Verify user belongs to same institute
-  const user = db.prepare('SELECT id, role FROM users WHERE id = ? AND institute_id = ?').get(id, req.user.instituteId) as any;
+  const user = db.prepare(`SELECT u.id, u.role FROM users u WHERE u.id = ? AND (
+    u.institute_id = ? OR (u.institute_id IS NULL AND u.role = 'student' AND EXISTS (
+      SELECT 1 FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id
+      WHERE ce.student_id = u.id AND c.institute_id = ?
+    ))
+  )`).get(id, req.user.instituteId, req.user.instituteId) as any;
   if (!user) {
     res.status(404).json({ error: 'User not found in your institute.' });
     return;
@@ -130,12 +169,17 @@ export function getStats(req: AuthRequest, res: Response): void {
 
   const iid = req.user.instituteId;
   const stats = {
-    totalStudents: (db.prepare("SELECT COUNT(*) as c FROM users WHERE institute_id = ? AND role = 'student'").get(iid) as any)?.c || 0,
+    totalStudents: (db.prepare(`SELECT COUNT(DISTINCT u.id) as c FROM users u WHERE u.role = 'student' AND (
+      u.institute_id = ? OR (u.institute_id IS NULL AND EXISTS (SELECT 1 FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id WHERE ce.student_id = u.id AND c.institute_id = ?))
+    )`).get(iid, iid) as any)?.c || 0,
     totalTeachers: (db.prepare("SELECT COUNT(*) as c FROM users WHERE institute_id = ? AND role = 'teacher'").get(iid) as any)?.c || 0,
     totalClasses: (db.prepare('SELECT COUNT(*) as c FROM classes WHERE institute_id = ?').get(iid) as any)?.c || 0,
-    activeStudents: (db.prepare("SELECT COUNT(*) as c FROM users WHERE institute_id = ? AND role = 'student' AND status = 'active'").get(iid) as any)?.c || 0,
+    totalLabs: (db.prepare('SELECT COUNT(*) as c FROM lab_modules lm JOIN users u ON u.id = lm.teacher_id WHERE u.institute_id = ?').get(iid) as any)?.c || 0,
+    activeStudents: (db.prepare(`SELECT COUNT(DISTINCT u.id) as c FROM users u WHERE u.role = 'student' AND u.status = 'active' AND (
+      u.institute_id = ? OR (u.institute_id IS NULL AND EXISTS (SELECT 1 FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id WHERE ce.student_id = u.id AND c.institute_id = ?))
+    )`).get(iid, iid) as any)?.c || 0,
     pendingVerifications: (db.prepare("SELECT COUNT(*) as c FROM users WHERE institute_id = ? AND is_verified = 0").get(iid) as any)?.c || 0,
-    recentJoins: db.prepare("SELECT id, name, email, role, created_at FROM users WHERE institute_id = ? ORDER BY created_at DESC LIMIT 5").all(iid),
+    recentJoins: db.prepare("SELECT id, name, email, role, status, created_at FROM users WHERE institute_id = ? ORDER BY created_at DESC LIMIT 5").all(iid),
   };
 
   res.json(stats);

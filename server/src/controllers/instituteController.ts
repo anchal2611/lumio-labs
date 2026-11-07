@@ -106,7 +106,32 @@ export function updateDomains(req: AuthRequest, res: Response): void {
   }
 
   const cleaned = domains.map((d: string) => d.trim().toLowerCase()).filter(Boolean);
-  db.prepare('UPDATE institutes SET email_domains = ? WHERE id = ?').run(JSON.stringify(cleaned), req.user.instituteId);
+  if (cleaned.some((domain) => !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain))) {
+    res.status(400).json({ error: 'Enter valid email domains, such as university.edu.' });
+    return;
+  }
+  const otherInstitutes = db.prepare('SELECT id, email_domains FROM institutes WHERE id != ?').all(req.user.instituteId) as any[];
+  const conflicts = new Set<string>();
+  for (const other of otherInstitutes) {
+    try {
+      for (const domain of JSON.parse(other.email_domains || '[]')) {
+        if (cleaned.includes(String(domain).toLowerCase())) conflicts.add(String(domain).toLowerCase());
+      }
+    } catch { /* ignore a malformed legacy domain list */ }
+  }
+  if (conflicts.size) {
+    res.status(409).json({ error: `These domains are already linked to another institute: ${[...conflicts].join(', ')}` });
+    return;
+  }
+
+  db.transaction(() => {
+    db.prepare('UPDATE institutes SET email_domains = ? WHERE id = ?').run(JSON.stringify(cleaned), req.user!.instituteId);
+    if (cleaned.length) {
+      const placeholders = cleaned.map(() => '?').join(', ');
+      db.prepare(`UPDATE users SET institute_id = ? WHERE institute_id IS NULL AND role = 'student' AND lower(substr(email, instr(email, '@') + 1)) IN (${placeholders})`)
+        .run(req.user!.instituteId, ...cleaned);
+    }
+  })();
   res.json({ message: 'Email domains updated.', domains: cleaned });
 }
 
@@ -119,18 +144,26 @@ export function getInstituteUsers(req: AuthRequest, res: Response): void {
   const { role, page = '1', limit = '50' } = req.query as any;
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
-  let query = 'SELECT id, name, email, role, status, avatar, created_at FROM users WHERE institute_id = ?';
-  const params: any[] = [req.user.instituteId];
+  const instituteUserScope = `(
+    u.institute_id = ? OR (u.institute_id IS NULL AND u.role = 'student' AND EXISTS (
+      SELECT 1 FROM class_enrollments ce JOIN classes c ON c.id = ce.class_id
+      WHERE ce.student_id = u.id AND c.institute_id = ?
+    ))
+  )`;
+  let query = `SELECT u.id, u.name, u.email, u.role, u.status, u.avatar, u.created_at FROM users u WHERE ${instituteUserScope}`;
+  const params: any[] = [req.user.instituteId, req.user.instituteId];
 
   if (role) {
-    query += ' AND role = ?';
+    query += ' AND u.role = ?';
     params.push(role);
   }
   query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(parseInt(limit), offset);
 
   const users = db.prepare(query).all(...params);
-  const total = (db.prepare(`SELECT COUNT(*) as c FROM users WHERE institute_id = ?${role ? ' AND role = ?' : ''}`).get(...(role ? [req.user.instituteId, role] : [req.user.instituteId])) as any)?.c || 0;
+  const countParams: any[] = [req.user.instituteId, req.user.instituteId];
+  if (role) countParams.push(role);
+  const total = (db.prepare(`SELECT COUNT(*) as c FROM users u WHERE ${instituteUserScope}${role ? ' AND u.role = ?' : ''}`).get(...countParams) as any)?.c || 0;
 
   res.json({ users, total, page: parseInt(page), limit: parseInt(limit) });
 }

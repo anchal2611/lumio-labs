@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
@@ -17,19 +17,22 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useAuth } from '../../contexts/AuthContext';
-import { MOCK_STUDENTS_LIST, MOCK_LABS } from '../../services/mockData';
+import { apiGet } from '../../services/api';
+
+type AdminStats = { totalStudents: number; totalTeachers: number; totalClasses: number; totalLabs: number; activeStudents: number; recentJoins: Array<{ id: string; name: string; email: string; role: string; status: string; created_at: string }> };
 
 export const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const auditEvents = [
-    { id: '1', action: 'Teacher Verified', user: 'Prof. Marcus Vance', time: '10 mins ago', status: 'Success' },
-    { id: '2', action: 'Practical Published', user: 'Dr. Eleanor Brooks', time: '1 hour ago', status: 'Success' },
-    { id: '3', action: 'WASM Sandbox Loaded', user: 'Alex Chen', time: '2 hours ago', status: 'Notice' },
-    { id: '4', action: 'Password Reset', user: 'Liam O\'Connor', time: '5 hours ago', status: 'Success' },
-  ];
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [activeSessions, setActiveSessions] = useState(0);
+  const [loadError, setLoadError] = useState('');
+  useEffect(() => {
+    let alive = true;
+    Promise.all([apiGet<AdminStats>('/admin/stats'), apiGet<{ sessions: unknown[] }>('/collab/sessions')])
+      .then(([data, sessions]) => { if (alive) { setStats(data); setActiveSessions(sessions.sessions?.length || 0); } })
+      .catch((err) => { if (alive) setLoadError(err instanceof Error ? err.message : 'Could not load institute overview.'); });
+    return () => { alive = false; };
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -38,13 +41,13 @@ export const AdminDashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-amber-400 text-xs font-semibold mb-3">
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Digital Infrastructure Management Portal</span>
+            <span>Institute administration</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Institutional Laboratory Administration
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Oversee all registered students, verify faculty credentials, monitor concurrent sandbox execution clusters, and maintain audit integrity.
+            Review students, faculty, laboratories and collaboration activity for your institute.
           </p>
 
           <div className="mt-5 flex items-center gap-3 flex-wrap">
@@ -62,7 +65,7 @@ export const AdminDashboard: React.FC = () => {
               className="bg-white/10 text-white border-white/20 hover:bg-white/20"
               onClick={() => navigate('/admin/reports')}
             >
-              View System Audit Logs
+              View Reports
             </Button>
           </div>
         </div>
@@ -71,12 +74,10 @@ export const AdminDashboard: React.FC = () => {
         <div className="relative z-10 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-center min-w-[200px]">
           <div className="flex items-center justify-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">Cluster Online</span>
+            <span className="text-xs font-bold text-white uppercase tracking-wider">Workspace Online</span>
           </div>
-          <p className="text-[11px] text-slate-300">SQLite WASM & Sandbox Active</p>
-          <Badge variant="warning" size="sm" className="mt-3">
-            Demo Analytics Active
-          </Badge>
+          <p className="text-[11px] text-slate-300">Institute data loaded from the API</p>
+          <Badge variant="aqua" size="sm" className="mt-3">Live institute data</Badge>
         </div>
       </div>
 
@@ -89,7 +90,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-[11px] text-brand-muted font-medium">Registered Students</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">1,248</h3>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{stats?.totalStudents ?? '—'}</h3>
             </div>
           </CardContent>
         </Card>
@@ -101,7 +102,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-[11px] text-brand-muted font-medium">Verified Faculty</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">64 Professors</h3>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{stats?.totalTeachers ?? '—'} Teachers</h3>
             </div>
           </CardContent>
         </Card>
@@ -113,7 +114,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-[11px] text-brand-muted font-medium">Active Laboratories</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{MOCK_LABS.length} Stations</h3>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{stats?.totalLabs ?? '—'} Labs</h3>
             </div>
           </CardContent>
         </Card>
@@ -125,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-[11px] text-brand-muted font-medium">Concurrent Sessions</p>
-              <h3 className="text-lg font-bold text-navy-900 mt-0.5">28 Live Peers</h3>
+              <h3 className="text-lg font-bold text-navy-900 mt-0.5">{activeSessions} Active</h3>
             </div>
           </CardContent>
         </Card>
@@ -138,9 +139,9 @@ export const AdminDashboard: React.FC = () => {
           <Card className="border border-slate-200/80">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle>User Directory & Verification</CardTitle>
+                <CardTitle>Recent institute users</CardTitle>
                 <p className="text-xs text-brand-muted mt-0.5">
-                  Recent student registrations and pending faculty access requests
+                  Latest student, teacher and administrator accounts
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => navigate('/admin/users')}>
@@ -153,61 +154,62 @@ export const AdminDashboard: React.FC = () => {
                   <tr>
                     <th className="p-3.5">User</th>
                     <th className="p-3.5">Role</th>
-                    <th className="p-3.5">Department</th>
-                    <th className="p-3.5">Verification</th>
-                    <th className="p-3.5 text-right">Actions</th>
+                    <th className="p-3.5">Email</th>
+                    <th className="p-3.5">Account</th>
+                    <th className="p-3.5 text-right">Joined</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {MOCK_STUDENTS_LIST.slice(0, 4).map((u) => (
+                  {loadError && <tr><td colSpan={5} className="p-4 text-center text-red-700">{loadError}</td></tr>}
+                  {!loadError && (stats?.recentJoins || []).map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50">
                       <td className="p-3.5 font-bold text-navy-900">{u.name}</td>
                       <td className="p-3.5 capitalize font-medium">{u.role}</td>
-                      <td className="p-3.5 text-slate-600">{u.department}</td>
+                      <td className="p-3.5 text-slate-600">{u.email}</td>
                       <td className="p-3.5">
-                        <Badge variant="success" size="sm">
-                          Verified
+                        <Badge variant={u.status === 'active' ? 'success' : 'warning'} size="sm">
+                          {u.status}
                         </Badge>
                       </td>
-                      <td className="p-3.5 text-right">
-                        <Button size="sm" variant="ghost" className="text-xs">
-                          Edit
-                        </Button>
+                      <td className="p-3.5 text-right text-slate-500">
+                        {new Date(u.created_at).toLocaleDateString()}
                       </td>
                     </tr>
                   ))}
+                  {!loadError && stats && stats.recentJoins.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-brand-muted">No institute users yet.</td></tr>}
                 </tbody>
               </table>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column: Security Audit Logs */}
+        {/* Recent registrations */}
         <div className="space-y-6">
           <Card className="border border-slate-200/80">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <History className="w-4 h-4 text-primary" />
-                <span>Security Audit Log</span>
+                <span>Recent registrations</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {auditEvents.map((evt) => (
+              {(stats?.recentJoins || []).slice(0, 4).map((evt) => (
                 <div key={evt.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-navy-900">{evt.action}</span>
-                    <span className="text-[10px] text-slate-400">{evt.time}</span>
+                    <span className="font-bold text-navy-900">New {evt.role} account</span>
+                    <span className="text-[10px] text-slate-400">{new Date(evt.created_at).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-[11px] text-brand-muted mt-1">Initiator: {evt.user}</p>
+                  <p className="text-[11px] text-brand-muted mt-1">{evt.name} · {evt.email}</p>
                 </div>
               ))}
+              {!loadError && stats?.recentJoins.length === 0 && <p className="py-4 text-center text-xs text-brand-muted">Recent registrations will appear here.</p>}
               <Button
                 size="sm"
                 variant="outline"
                 className="w-full text-xs"
                 onClick={() => navigate('/admin/reports')}
               >
-                View Detailed Audit Trail
+                View Reports
               </Button>
             </CardContent>
           </Card>
