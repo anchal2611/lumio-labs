@@ -42,7 +42,7 @@ apiRouter.get('/auth/me', verifyToken, me as any);
 apiRouter.get('/auth/check-domain', checkDomain);
 
 // ─── Institute Registration (public) ─────────────────
-apiRouter.post('/institutes/register', registerInstitute);
+apiRouter.post('/institutes/register', verifyFirebaseTokenWhenPresent, registerInstitute);
 
 // ─── Institute Management (admin only) ───────────────
 apiRouter.get('/institutes/me', verifyToken, requireRole(['admin']), getMyInstitute as any);

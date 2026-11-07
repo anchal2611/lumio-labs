@@ -8,9 +8,14 @@ import { AuthRequest } from '../middleware/auth';
 export async function registerInstitute(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { instituteName, slug, type, city, website, adminName, adminEmail, adminPassword, emailDomains } = req.body;
+    const firebaseUser = req.firebaseUser;
 
-    if (!instituteName || !adminName || !adminEmail || !adminPassword) {
-      res.status(400).json({ error: 'Institute name, admin name, email and password are required.' });
+    if (!instituteName || !adminName || !adminEmail || (!adminPassword && !firebaseUser)) {
+      res.status(400).json({ error: 'Institute name, admin name and email are required.' });
+      return;
+    }
+    if (firebaseUser && firebaseUser.email.toLowerCase() !== String(adminEmail).toLowerCase()) {
+      res.status(403).json({ error: 'Firebase account email does not match admin email.' });
       return;
     }
 
@@ -30,8 +35,8 @@ export async function registerInstitute(req: AuthRequest, res: Response): Promis
     }
 
     const instituteId = uuid();
-    const adminId = uuid();
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const adminId = firebaseUser?.uid || uuid();
+    const passwordHash = firebaseUser ? 'firebase-managed' : await bcrypt.hash(adminPassword, 10);
     const domains = JSON.stringify(Array.isArray(emailDomains) ? emailDomains : []);
 
     db.prepare(`

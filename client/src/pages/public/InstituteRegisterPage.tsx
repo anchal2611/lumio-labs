@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, User, Globe, CheckCircle2, Plus, X, Loader2, FlaskConical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { apiPost } from '../../services/api';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { firebaseAuth, saveFirebaseUserProfile } from '../../services/firebase';
 
 const STEPS = ['Institute Details', 'Admin Account', 'Email Domains', 'Complete'];
 
@@ -45,6 +47,15 @@ export const InstituteRegisterPage: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
+      let firebaseUser = firebaseAuth?.currentUser || null;
+      if (firebaseAuth && !firebaseUser) {
+        try {
+          firebaseUser = (await createUserWithEmailAndPassword(firebaseAuth, form.adminEmail, form.adminPassword)).user;
+        } catch (authError: any) {
+          if (authError?.code !== 'auth/email-already-in-use') throw authError;
+          firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, form.adminEmail, form.adminPassword)).user;
+        }
+      }
       const res = await apiPost<any>('/institutes/register', {
         instituteName: form.instituteName,
         type: form.type,
@@ -52,9 +63,12 @@ export const InstituteRegisterPage: React.FC = () => {
         website: form.website,
         adminName: form.adminName,
         adminEmail: form.adminEmail,
-        adminPassword: form.adminPassword,
+        ...(firebaseUser ? {} : { adminPassword: form.adminPassword }),
         emailDomains: form.emailDomains,
       });
+      if (firebaseUser) {
+        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: form.adminName, email: form.adminEmail }).catch(() => {});
+      }
       setResult(res);
       setStep(3);
     } catch (e: any) {
