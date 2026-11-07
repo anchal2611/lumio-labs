@@ -31,28 +31,40 @@ const firebaseApiKey = rawEnv.VITE_FIREBASE_API_KEY || '';
 const firebaseProjectId = rawEnv.VITE_FIREBASE_PROJECT_ID || '';
 
 const isViteDev = typeof window !== 'undefined' && window.location.port === '5173';
+const localHostnames = new Set(['localhost', '127.0.0.1', '::1']);
+const isLocalFrontend = typeof window !== 'undefined' && localHostnames.has(window.location.hostname);
 const defaultHost = isViteDev ? 'http://localhost:5000' : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
 const configuredApiBaseUrl = String(rawEnv.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
 
 function resolveApiBaseUrl(): string {
   if (!configuredApiBaseUrl) return isViteDev ? '/api' : `${defaultHost}/api`;
 
-  // A localhost URL without an explicit port commonly comes from a mistaken
-  // VITE_API_BASE_URL. In dev the API listens on 5000; in production the API
-  // is served by the same origin as the client.
   try {
     const configured = new URL(configuredApiBaseUrl);
-    const isLoopback = configured.hostname === 'localhost' || configured.hostname === '127.0.0.1';
-    if (isLoopback && !configured.port) {
-      return isViteDev
-        ? `http://localhost:5000${configured.pathname.replace(/\/$/, '')}`
-        : `${defaultHost}${configured.pathname.replace(/\/$/, '')}`;
+    if (localHostnames.has(configured.hostname)) {
+      const path = configured.pathname.replace(/\/$/, '');
+      // A hosted browser cannot reach localhost on the developer's machine.
+      // Render serves the client and API from the same origin.
+      if (!isLocalFrontend) return `${window.location.origin}${path}`;
+      if (!configured.port) return `http://localhost:5000${path}`;
     }
   } catch {
     // Relative API paths are valid and are resolved by the browser.
   }
 
   return configuredApiBaseUrl;
+}
+
+function resolveSocketUrl(value?: string): string {
+  const configured = String(value || '').trim();
+  if (!configured) return defaultHost;
+  try {
+    const url = new URL(configured);
+    if (localHostnames.has(url.hostname)) return isLocalFrontend ? (url.port ? configured : defaultHost) : window.location.origin;
+  } catch {
+    // Keep valid relative socket URLs as provided.
+  }
+  return configured;
 }
 
 export const config: AppConfig = {
@@ -65,8 +77,8 @@ export const config: AppConfig = {
   enableAiLab: rawEnv.VITE_ENABLE_AI_LAB !== 'false',
   enableCollaboration: rawEnv.VITE_ENABLE_COLLABORATION !== 'false',
   apiBaseUrl: resolveApiBaseUrl(),
-  socketUrl: rawEnv.VITE_SOCKET_URL || defaultHost,
-  collaborationUrl: rawEnv.VITE_COLLABORATION_URL || defaultHost,
+  socketUrl: resolveSocketUrl(rawEnv.VITE_SOCKET_URL),
+  collaborationUrl: resolveSocketUrl(rawEnv.VITE_COLLABORATION_URL),
   firebase: {
     apiKey: firebaseApiKey,
     authDomain: rawEnv.VITE_FIREBASE_AUTH_DOMAIN || '',
