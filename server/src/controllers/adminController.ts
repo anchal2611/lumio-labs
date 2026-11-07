@@ -1,7 +1,6 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
-import { randomBytes } from 'crypto';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
 import { firebaseAdminAuth, hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
@@ -15,9 +14,13 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { name, email, designation, department, employeeId } = req.body;
+    const { name, email, password, designation, department, employeeId } = req.body;
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 120 || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       res.status(400).json({ error: 'Name and email are required.' });
+      return;
+    }
+    if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+      res.status(400).json({ error: 'Password must be between 8 and 128 characters.' });
       return;
     }
     if ([designation, department, employeeId].some((value) => value !== undefined && value !== null && (typeof value !== 'string' || value.length > 120))) {
@@ -32,8 +35,6 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Generate temporary password
-    const tempPassword = `Lumio@${randomBytes(9).toString('base64url')}7!`;
     if (process.env.NODE_ENV === 'production' && !hasFirebaseAdminCredentials) {
       res.status(503).json({ error: 'Teacher account provisioning requires FIREBASE_SERVICE_ACCOUNT_JSON in the server environment.' });
       return;
@@ -44,7 +45,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     if (hasFirebaseAdminCredentials) {
       try {
         const firebaseUser = await firebaseAdminAuth.createUser({
-          email: normalizedEmail, password: tempPassword, displayName: name.trim(), emailVerified: true,
+          email: normalizedEmail, password, displayName: name.trim(), emailVerified: true,
         });
         teacherId = firebaseUser.uid;
         firebaseUserCreated = true;
@@ -58,7 +59,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     }
 
     try {
-      const passwordHash = hasFirebaseAdminCredentials ? 'firebase-managed' : await bcrypt.hash(tempPassword, 10);
+      const passwordHash = hasFirebaseAdminCredentials ? 'firebase-managed' : await bcrypt.hash(password, 10);
       db.transaction(() => {
         db.prepare(`
           INSERT INTO users (id, name, email, password_hash, role, institute_id, is_verified, status)
@@ -79,8 +80,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     res.status(201).json({
       message: 'Teacher account created.',
       teacher: { id: teacherId, name: name.trim(), email: normalizedEmail, designation, department, status: 'active', created_at: new Date().toISOString() },
-      temporaryPassword: tempPassword,
-      note: 'Please share this temporary password securely. The teacher should change it upon first login.',
+      note: 'The teacher can sign in with the email and password set by the administrator.',
     });
   } catch (err: any) {
     console.error('Create teacher error:', err);

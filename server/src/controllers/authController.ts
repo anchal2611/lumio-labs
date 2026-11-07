@@ -5,6 +5,39 @@ import crypto from 'crypto';
 import db from '../db/database';
 import { signToken, signRefreshToken, verifyRefreshToken, AuthRequest, REFRESH_EXPIRES_IN } from '../middleware/auth';
 
+function serializeUser(user: any, profile: any, institute: any): Record<string, any> {
+  const normalizedProfile = {
+    rollNumber: profile?.roll_number ?? profile?.rollNumber ?? undefined,
+    branch: profile?.branch ?? undefined,
+    semester: profile?.semester === null || profile?.semester === undefined ? undefined : Number(profile.semester),
+    department: profile?.department ?? undefined,
+    designation: profile?.designation ?? undefined,
+    employeeId: profile?.employee_id ?? profile?.employeeId ?? undefined,
+  };
+  const createdAt = user.created_at ?? user.createdAt;
+  const instituteInfo = institute ? { id: institute.id, name: institute.name, slug: institute.slug } : null;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    instituteId: user.institute_id ?? user.instituteId ?? null,
+    institute: instituteInfo,
+    status: user.status,
+    avatar: user.avatar ?? undefined,
+    createdAt,
+    profile: normalizedProfile,
+    university: instituteInfo?.name,
+    department: normalizedProfile.department,
+    branch: normalizedProfile.branch,
+    semester: normalizedProfile.semester,
+    rollNumber: normalizedProfile.rollNumber,
+    joinedAt: createdAt,
+    isVerified: Boolean(user.is_verified ?? user.isVerified),
+  };
+}
+
 function getInstituteIdByEmailDomain(email: string): string | null {
   const domain = email.split('@')[1]?.toLowerCase();
   if (!domain) return null;
@@ -74,7 +107,8 @@ export async function register(req: Request, res: Response): Promise<void> {
       `).run(userId, designation || null, department || null, employeeId || null);
     }
 
-    const user = db.prepare('SELECT id, name, email, role, institute_id, status, created_at FROM users WHERE id = ?').get(userId) as any;
+    const user = db.prepare('SELECT id, name, email, role, institute_id, status, is_verified, created_at FROM users WHERE id = ?').get(userId) as any;
+    const profile = db.prepare('SELECT * FROM student_profiles WHERE user_id = ?').get(userId) as any;
     const institute = user.institute_id
       ? db.prepare('SELECT id, name, slug FROM institutes WHERE id = ?').get(user.institute_id) as any
       : null;
@@ -93,16 +127,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     res.status(201).json({
       ...(token ? { token } : {}),
       refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        instituteId: user.institute_id,
-        institute: institute ? { id: institute.id, name: institute.name, slug: institute.slug } : null,
-        status: user.status,
-        createdAt: user.created_at,
-      },
+      user: serializeUser(user, profile, institute),
     });
   } catch (err: any) {
     console.error('Register error:', err);
@@ -165,18 +190,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.json({
       token,
       refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        instituteId: user.institute_id,
-        institute: institute ? { id: institute.id, name: institute.name, slug: institute.slug } : null,
-        status: user.status,
-        avatar: user.avatar,
-        createdAt: user.created_at,
-        profile,
-      },
+      user: serializeUser(user, profile, institute),
     });
   } catch (err: any) {
     console.error('Login error:', err);
@@ -224,7 +238,7 @@ export function refresh(req: Request, res: Response): void {
 }
 
 export function me(req: AuthRequest, res: Response): void {
-  const user = db.prepare('SELECT id, name, email, role, institute_id, status, avatar, created_at FROM users WHERE id = ?').get(req.user!.userId) as any;
+  const user = db.prepare('SELECT id, name, email, role, institute_id, status, avatar, is_verified, created_at FROM users WHERE id = ?').get(req.user!.userId) as any;
   if (!user) {
     res.status(404).json({ error: 'User not found.' });
     return;
@@ -241,11 +255,7 @@ export function me(req: AuthRequest, res: Response): void {
     ? db.prepare('SELECT id, name, slug, email_domains FROM institutes WHERE id = ?').get(user.institute_id) as any
     : null;
 
-  res.json({
-    id: user.id, name: user.name, email: user.email, role: user.role,
-    instituteId: user.institute_id, institute, status: user.status,
-    avatar: user.avatar, createdAt: user.created_at, profile,
-  });
+  res.json(serializeUser(user, profile, institute));
 }
 
 export function checkDomain(req: Request, res: Response): void {
