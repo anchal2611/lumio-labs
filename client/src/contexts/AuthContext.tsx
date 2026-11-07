@@ -83,10 +83,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       if (firebaseAuth) {
-        const credential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
-        await saveFirebaseUserProfile({ uid: credential.user.uid, name: data.name, email: data.email });
-        const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data, password: undefined });
-        const profile = result.user;
+        let firebaseUser;
+        try {
+          firebaseUser = (await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
+        } catch (authError: any) {
+          if (authError?.code !== 'auth/email-already-in-use') throw authError;
+          firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
+        }
+        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: data.name, email: data.email });
+        let profile: UserProfile;
+        try {
+          const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data, password: undefined });
+          profile = result.user;
+        } catch (registerError) {
+          if (!(registerError instanceof Error) || !registerError.message.includes('already exists')) throw registerError;
+          profile = await apiGet<UserProfile>('/auth/me');
+        }
         setUser(profile);
         localStorage.setItem(USER_KEY, JSON.stringify(profile));
         return;
