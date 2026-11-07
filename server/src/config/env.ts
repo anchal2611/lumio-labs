@@ -13,7 +13,7 @@ export const config = {
   logLevel: process.env.LOG_LEVEL || 'info',
   judge0: {
     provider: process.env.CODE_EXECUTION_PROVIDER || 'judge0',
-    apiUrl: process.env.JUDGE0_API_URL || 'https://judge0-ce.p.rapidapi.com',
+    apiUrl: process.env.JUDGE0_API_URL || 'https://ce.judge0.com',
     apiKey: process.env.JUDGE0_API_KEY || '',
     timeoutMs: parseInt(process.env.CODE_EXECUTION_TIMEOUT || '10000', 10),
     memoryLimitKb: parseInt(process.env.CODE_EXECUTION_MEMORY_LIMIT || '128000', 10),
@@ -24,3 +24,12 @@ export const config = {
     apiSecret: process.env.COLLABORATION_API_SECRET || 'collab_secret_key',
   },
 };
+
+export function isPublicJudge0Endpoint(apiUrl: string = config.judge0.apiUrl): boolean {
+  try {
+    const endpoint = new URL(apiUrl);
+    return endpoint.protocol === 'https:' && endpoint.hostname === 'ce.judge0.com';
+  } catch {
+    return false;
+  }
+}

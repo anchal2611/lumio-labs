@@ -23,6 +23,7 @@ import { createAssignment, listAssignments, submitAssignment, getSubmissions, gr
 // Collab
 import { createSession, listSessions, getSession, endSession } from '../controllers/collabController';
 import { hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
+import { config, isPublicJudge0Endpoint } from '../config/env';
 import { listAuditLogs, listNotifications, markAllNotificationsRead, markNotificationRead } from '../controllers/activityController';
 import { getConversationMessages, listConversations, listMessageContacts, sendMessage } from '../controllers/messageController';
 import { createResource, deleteResource, listResources } from '../controllers/resourceController';
@@ -34,7 +35,7 @@ apiRouter.get('/health', (_req, res) => {
   res.json({
     status: 'ok', service: 'LUMIO Platform API v2', timestamp: new Date().toISOString(), version: '2.0.0',
     firebaseAdminConfigured: hasFirebaseAdminCredentials,
-    codeExecutionConfigured: Boolean(process.env.JUDGE0_API_KEY),
+    codeExecutionConfigured: Boolean(config.judge0.apiKey) || isPublicJudge0Endpoint(),
   });
 });
 

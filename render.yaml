@@ -32,7 +32,7 @@ services:
       - key: JUDGE0_API_KEY
         sync: false
       - key: JUDGE0_API_URL
-        value: https://judge0-ce.p.rapidapi.com
+        value: https://ce.judge0.com
       - key: VITE_FIREBASE_API_KEY
         value: AIzaSyD6VJbejH09YUbBGwfmMWYn4i36fw0Vj4s
       - key: VITE_FIREBASE_AUTH_DOMAIN

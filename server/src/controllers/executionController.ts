@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { config } from '../config/env';
+import { config, isPublicJudge0Endpoint } from '../config/env';
 
 const LANGUAGE_MAP: Record<string, number> = {
   python: 71,
@@ -98,16 +98,18 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
     return;
   }
 
-  // 1. If Judge0 API is explicitly configured with a key, try it first
-  if (config.judge0.apiKey) {
+  // The public Judge0 CE endpoint works without credentials; RapidAPI requires a key.
+  const isPublicJudge0 = isPublicJudge0Endpoint();
+  if (config.judge0.apiKey || isPublicJudge0) {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (!isPublicJudge0) {
+        headers['X-RapidAPI-Key'] = config.judge0.apiKey;
+        headers['X-RapidAPI-Host'] = new URL(config.judge0.apiUrl).hostname;
+      }
       const submissionResponse = await fetch(`${config.judge0.apiUrl}/submissions?base64_encoded=false&wait=true`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RapidAPI-Key': config.judge0.apiKey,
-          'X-RapidAPI-Host': new URL(config.judge0.apiUrl).hostname,
-        },
+        headers,
         body: JSON.stringify({
           source_code: code,
           language_id: langId,
@@ -125,14 +127,14 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
           exitCode: result.status?.id === 3 ? 0 : 1,
           timeMs: Math.round((parseFloat(result.time) || 0.05) * 1000),
           memoryKb: result.memory || 4096,
-          provider: 'Judge0 Sandbox Cluster',
+          provider: isPublicJudge0 ? 'Judge0 CE Public API' : 'Judge0 Sandbox Cluster',
         });
         return;
       }
       const providerMessage = typeof result.message === 'string' ? result.message.slice(0, 300) : '';
       console.warn(`Judge0 returned HTTP ${submissionResponse.status}${providerMessage ? `: ${providerMessage}` : ''}`);
       res.status(502).json({
-        error: `The code execution provider rejected this request (HTTP ${submissionResponse.status}).${providerMessage ? ` ${providerMessage}` : ' Check the Judge0 API key, host, and quota in Render.'}`,
+        error: `The code execution provider rejected this request (HTTP ${submissionResponse.status}).${providerMessage ? ` ${providerMessage}` : ' Check the Judge0 endpoint, API key, and provider quota in Render.'}`,
       });
       return;
     } catch (err: any) {
@@ -147,7 +149,7 @@ export async function executeCodeHandler(req: Request, res: Response): Promise<v
   // Never execute submitted source code inside the web server process in
   // production. Local runtimes below are for development only.
   if (config.nodeEnv === 'production') {
-    res.status(503).json({ error: 'Code execution is not configured on this deployment. Add a valid JUDGE0_API_KEY to the Render web service environment, then redeploy.' });
+    res.status(503).json({ error: 'Code execution is not configured. Set JUDGE0_API_URL to https://ce.judge0.com for the public Judge0 CE endpoint, or configure a valid JUDGE0_API_KEY for RapidAPI, then redeploy.' });
     return;
   }
 
