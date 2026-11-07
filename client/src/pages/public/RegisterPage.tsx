@@ -45,7 +45,7 @@ export const RegisterPage: React.FC = () => {
       finally { setCheckingDomain(false); }
     }, 600);
     return () => clearTimeout(timer);
-  }, [watchEmail, setValue]);
+  }, [watchEmail]);
 
   const onSubmit = async (data: RegisterForm) => {
     setError(null);
