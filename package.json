@@ -5,7 +5,7 @@
   "engines": { "node": ">=22 <25" },
   "description": "LUMIO — Collaborative Virtual Laboratory Platform",
   "scripts": {
-    "install:all": "npm ci --prefix server && npm ci --prefix client",
+    "install:all": "npm ci --include=dev --prefix server && npm ci --include=dev --prefix client",
     "dev:client": "npm --prefix client run dev",
     "dev:server": "npm --prefix server run dev",
     "build:client": "npm --prefix client run build",
