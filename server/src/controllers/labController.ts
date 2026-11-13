@@ -127,16 +127,20 @@ export function listLabs(req: AuthRequest, res: Response): void {
     query += ' ORDER BY lm.created_at DESC';
     labs = db.prepare(query).all(...params);
   } else {
-    // Students: get published labs from enrolled classes
+    // Students: get published labs from enrolled classes, institute, or open virtual labs
     let query = `
-      SELECT lm.*, u.name as teacher_name 
+      SELECT DISTINCT lm.*, u.name as teacher_name, c.name as class_name 
       FROM lab_modules lm
       JOIN users u ON u.id = lm.teacher_id
-      JOIN classes c ON c.id = lm.class_id
-      JOIN class_enrollments ce ON ce.class_id = c.id
-      WHERE ce.student_id = ? AND lm.is_published = 1
+      LEFT JOIN classes c ON c.id = lm.class_id
+      LEFT JOIN class_enrollments ce ON ce.class_id = c.id AND ce.student_id = ?
+      WHERE lm.is_published = 1 AND (
+        ce.student_id IS NOT NULL 
+        OR lm.class_id IS NULL 
+        OR (u.institute_id = ? AND ? IS NOT NULL)
+      )
     `;
-    const params: any[] = [user.userId];
+    const params: any[] = [user.userId, user.instituteId, user.instituteId];
     if (classId) {
       query += ' AND lm.class_id = ?';
       params.push(classId);
@@ -177,7 +181,8 @@ export function getLab(req: AuthRequest, res: Response): void {
     }
     if (lab.class_id) {
       const enrolled = db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(lab.class_id, req.user!.userId);
-      if (!enrolled) {
+      const isSameInstitute = req.user!.instituteId && lab.teacher_institute_id === req.user!.instituteId;
+      if (!enrolled && !isSameInstitute) {
         res.status(403).json({ error: 'You are not enrolled in the class this lab belongs to.' });
         return;
       }

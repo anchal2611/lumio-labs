@@ -64,11 +64,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       if (firebaseAuth) {
-        await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
-        const profile = await apiGet<UserProfile>('/auth/me');
-        setUser(profile);
-        localStorage.setItem(USER_KEY, JSON.stringify(profile));
-        return;
+        try {
+          await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+          const profile = await apiGet<UserProfile>('/auth/me');
+          setUser(profile);
+          localStorage.setItem(USER_KEY, JSON.stringify(profile));
+          return;
+        } catch (fbErr) {
+          console.warn('Firebase login failed, attempting local authentication fallback:', fbErr);
+        }
       }
       const res: any = await apiPost('/auth/login', data);
       setTokens(res.token, res.refreshToken);
@@ -83,25 +87,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       if (firebaseAuth) {
-        let firebaseUser;
         try {
-          firebaseUser = (await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
-        } catch (authError: any) {
-          if (authError?.code !== 'auth/email-already-in-use') throw authError;
-          firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
+          let firebaseUser;
+          try {
+            firebaseUser = (await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
+          } catch (authError: any) {
+            if (authError?.code !== 'auth/email-already-in-use') throw authError;
+            firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, data.email, data.password)).user;
+          }
+          await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: data.name, email: data.email }).catch(() => {});
+          let profile: UserProfile;
+          try {
+            const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data });
+            profile = result.user;
+          } catch (registerError) {
+            if (!(registerError instanceof Error) || !registerError.message.includes('already exists')) throw registerError;
+            profile = await apiGet<UserProfile>('/auth/me');
+          }
+          setUser(profile);
+          localStorage.setItem(USER_KEY, JSON.stringify(profile));
+          return;
+        } catch (fbErr) {
+          console.warn('Firebase registration failed, falling back to local registration:', fbErr);
         }
-        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: data.name, email: data.email }).catch(() => {});
-        let profile: UserProfile;
-        try {
-          const result = await apiPost<{ user: UserProfile }>('/auth/register', { ...data, password: undefined });
-          profile = result.user;
-        } catch (registerError) {
-          if (!(registerError instanceof Error) || !registerError.message.includes('already exists')) throw registerError;
-          profile = await apiGet<UserProfile>('/auth/me');
-        }
-        setUser(profile);
-        localStorage.setItem(USER_KEY, JSON.stringify(profile));
-        return;
       }
       const res: any = await apiPost('/auth/register', data);
       setTokens(res.token, res.refreshToken);

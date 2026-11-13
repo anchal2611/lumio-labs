@@ -78,7 +78,7 @@ export function listSessions(req: AuthRequest, res: Response): void {
 
   // Students: see peer sessions + faculty sessions (but not class sessions of other institutes)
   if (user.role === 'student') {
-    query += ' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR cs.class_id IN (SELECT class_id FROM class_enrollments WHERE student_id = ?))';
+    query += ' AND (cs.host_id = ? OR cs.type = \'peer\' OR (u.institute_id = ? AND ? IS NOT NULL) OR cs.class_id IN (SELECT class_id FROM class_enrollments WHERE student_id = ?))';
     params.push(user.userId, user.instituteId, user.instituteId, user.userId);
   } else if (user.role === 'teacher') {
     query += ' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR c.teacher_id = ?)';

@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
 import { createNotification, recordAudit } from './activityController';
+import { syncAssignmentToFirestore, syncSubmissionToFirestore } from '../services/firebaseService';
 
 // POST /api/assignments
 export function createAssignment(req: AuthRequest, res: Response): void {
@@ -49,7 +50,16 @@ export function createAssignment(req: AuthRequest, res: Response): void {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, labModuleId, classId, title.trim(), description || null, dueDate || null, marks);
 
-    const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(id);
+    const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(id) as any;
+    void syncAssignmentToFirestore({
+      id,
+      class_id: classId,
+      lab_module_id: labModuleId,
+      title: title.trim(),
+      description: description || null,
+      due_date: dueDate || null,
+      max_marks: marks,
+    });
     const students = db.prepare('SELECT student_id FROM class_enrollments WHERE class_id = ?').all(classId) as any[];
     for (const student of students) createNotification(student.student_id, 'assignment', 'New assignment', `${title.trim()} is available for submission.`, `/student/assignments`);
     recordAudit(req, 'assignment.created', 'assignment', id, `Created assignment "${title.trim()}" for class ${classId}.`);
@@ -222,6 +232,15 @@ export function gradeSubmission(req: AuthRequest, res: Response): void {
     return;
   }
 
+  void syncSubmissionToFirestore({
+    id: sid,
+    assignment_id: id,
+    student_id: (db.prepare('SELECT student_id FROM submissions WHERE id = ?').get(sid) as any)?.student_id || '',
+    status: 'graded',
+    marks,
+    feedback: feedback || null,
+    graded_at: new Date().toISOString(),
+  });
   const student = db.prepare('SELECT student_id FROM submissions WHERE id = ?').get(sid) as any;
   if (student) createNotification(student.student_id, 'submission_graded', 'Submission graded', `Your submission received ${marks}/${assignment.max_marks}${feedback ? `: ${String(feedback).slice(0, 240)}` : '.'}`, '/student/assignments');
   recordAudit(req, 'submission.graded', 'submission', sid, `Graded submission ${sid} with ${marks}/${assignment.max_marks}.`);

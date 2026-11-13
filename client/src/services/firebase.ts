@@ -1,5 +1,6 @@
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
+import { Firestore, getFirestore, collection, query, where, onSnapshot, orderBy, limit, Unsubscribe } from 'firebase/firestore';
 import { config } from '../config/env';
 
 const firebaseConfig = config.firebase;
@@ -17,6 +18,60 @@ export const firebaseApp: FirebaseApp | null = firebaseConfig.isConfigured
   : null;
 
 export const firebaseAuth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
+export const firebaseDb: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
+
+/**
+ * Subscribe to real-time notifications in Firebase Firestore for a specific user
+ */
+export function subscribeToUserNotifications(
+  userId: string,
+  onNotificationAdded: (notification: any) => void
+): Unsubscribe | null {
+  if (!firebaseDb || !userId) return null;
+  try {
+    const q = query(
+      collection(firebaseDb, 'notifications'),
+      where('userId', '==', userId),
+      limit(25)
+    );
+    return onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          onNotificationAdded(change.doc.data());
+        }
+      });
+    }, (err) => {
+      console.warn('Firebase Firestore notifications snapshot notice:', err.message);
+    });
+  } catch (err: any) {
+    console.warn('Could not attach Firestore notifications listener:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Subscribe to real-time classes created in Firebase Firestore
+ */
+export function subscribeToRealtimeClasses(
+  onClassAdded: (classData: any) => void
+): Unsubscribe | null {
+  if (!firebaseDb) return null;
+  try {
+    const q = query(collection(firebaseDb, 'classes'), limit(20));
+    return onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          onClassAdded(change.doc.data());
+        }
+      });
+    }, (err) => {
+      console.warn('Firebase Firestore classes snapshot notice:', err.message);
+    });
+  } catch (err: any) {
+    console.warn('Could not attach Firestore classes listener:', err.message);
+    return null;
+  }
+}
 
 export async function saveFirebaseUserProfile(profile: {
   uid: string;

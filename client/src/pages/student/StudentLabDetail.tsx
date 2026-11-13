@@ -15,6 +15,8 @@ import {
   Sparkles,
   Download,
   AlertCircle,
+  Box,
+  Maximize2,
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../services/api';
 import { config } from '../../config/env';
@@ -23,9 +25,37 @@ import { SqlWorkspace } from '../../components/labs/SqlWorkspace';
 import { CircuitWorkspace } from '../../components/labs/CircuitWorkspace';
 import { GuidedPracticalPanel } from '../../components/labs/GuidedPracticalPanel';
 import { MonacoWorkspace } from '../../components/labs/MonacoWorkspace';
+import { Lab3DModelViewer, ModelPresetType } from '../../components/labs/Lab3DModelViewer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../contexts/ToastContext';
+
+export function getModelPresetForLab(lab: { id?: string; category?: string; title?: string; name?: string; description?: string } | null | undefined): ModelPresetType {
+  if (!lab) return 'microcontroller';
+  const text = `${lab.id || ''} ${lab.category || ''} ${lab.title || ''} ${lab.name || ''} ${lab.description || ''}`.toLowerCase();
+
+  // 1. Robotics / Kinematics / Manipulator / Mechatronics
+  if (text.includes('robot') || text.includes('kinematic') || text.includes('arm') || text.includes('motor') || text.includes('servo') || text.includes('actuator') || text.includes('automation')) {
+    return 'robotics';
+  }
+
+  // 2. DNA / Bioinformatics / Biotech / Genetics / Molecular / Biology
+  if (text.includes('dna') || text.includes('bio') || text.includes('genom') || text.includes('helix') || text.includes('molecul') || text.includes('sequence') || text.includes('crispr')) {
+    return 'dna';
+  }
+
+  // 3. IoT / Microcontroller / Embedded / ESP32 / Arduino / Sensor / Telemetry / Circuit
+  if (text.includes('iot') || text.includes('esp32') || text.includes('arduino') || text.includes('embed') || text.includes('microcontroller') || text.includes('mcu') || text.includes('telemetry') || text.includes('circuit') || text.includes('sensor')) {
+    return 'microcontroller';
+  }
+
+  // 4. CPU / Hardware / Architecture / Systems / OS / Cache / Low-level / C / C++ / DSA / Assembly
+  if (text.includes('cpu') || text.includes('arch') || text.includes('hardware') || text.includes('chip') || text.includes('silicon') || text.includes('cpp') || text.includes('c++') || text.includes('dsa') || text.includes('system') || text.includes('os') || text.includes('processor')) {
+    return 'cpu';
+  }
+
+  return 'microcontroller';
+}
 
 interface Exercise {
   id: string;
@@ -70,6 +100,10 @@ export const StudentLabDetail: React.FC = () => {
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [showHints, setShowHints] = useState(false);
 
+  // View mode: code only, split with 3D model, or 3D model only
+  const [viewMode, setViewMode] = useState<'code' | 'split' | '3d'>('split');
+  const [iotViewTab, setIotViewTab] = useState<'3d' | 'breadboard'>('3d');
+
   // State for mock guided/workspace lab mode
   const [guidedMode, setGuidedMode] = useState<'guided' | 'workspace'>('guided');
   const practicals = mockLab ? MOCK_GUIDED_PRACTICALS[mockLab.id] || [] : [];
@@ -109,7 +143,9 @@ export const StudentLabDetail: React.FC = () => {
         if (isCurrentRequest) setLoadingDb(false);
       });
 
-    return () => { isCurrentRequest = false; };
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [labId, mockLab, loadAttempt]);
 
   // 1. Specialized Engine: SQL Lab
@@ -144,7 +180,7 @@ export const StudentLabDetail: React.FC = () => {
   if (labId === 'lab-iot') {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <Button
               size="sm"
@@ -162,8 +198,42 @@ export const StudentLabDetail: React.FC = () => {
               <p className="text-xs text-brand-muted mt-0.5">ESP32 microcontroller, sensors, actuators, and serial telemetry</p>
             </div>
           </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setIotViewTab('3d')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                iotViewTab === '3d'
+                  ? 'bg-navy-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-navy-900'
+              }`}
+            >
+              3D ESP32 MCU & Models
+            </button>
+            <button
+              onClick={() => setIotViewTab('breadboard')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                iotViewTab === 'breadboard'
+                  ? 'bg-navy-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-navy-900'
+              }`}
+            >
+              2D Circuit Breadboard
+            </button>
+          </div>
         </div>
-        <CircuitWorkspace />
+
+        {iotViewTab === '3d' ? (
+          <div className="h-[780px] rounded-xl overflow-hidden border border-slate-200 shadow-subtle">
+            <Lab3DModelViewer
+              key="mock-lab-iot-esp32-3d"
+              initialPreset="microcontroller"
+              title="ESP32 Virtual Microcontroller & Custom 3D Model Explorer"
+            />
+          </div>
+        ) : (
+          <CircuitWorkspace />
+        )}
       </div>
     );
   }
@@ -191,32 +261,71 @@ export const StudentLabDetail: React.FC = () => {
             </div>
           </div>
 
-          {currentPractical && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View Mode Toggle: Code, Split with 3D, or 3D Only */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <button
-                onClick={() => setGuidedMode('guided')}
+                type="button"
+                onClick={() => setViewMode('code')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  guidedMode === 'guided'
-                    ? 'bg-white text-primary shadow-xs'
-                    : 'text-brand-muted hover:text-navy-900'
+                  viewMode === 'code' ? 'bg-white text-navy-900 shadow-xs' : 'text-brand-muted hover:text-navy-900'
                 }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Guided Practicals</span>
-              </button>
-              <button
-                onClick={() => setGuidedMode('workspace')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  guidedMode === 'workspace'
-                    ? 'bg-white text-navy-900 shadow-xs'
-                    : 'text-brand-muted hover:text-navy-900'
-                }`}
+                title="Code Only"
               >
                 <Code2 className="w-3.5 h-3.5" />
-                <span>Open Workspace</span>
+                <span>Code Only</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === 'split' ? 'bg-white text-primary shadow-xs' : 'text-brand-muted hover:text-navy-900'
+                }`}
+                title="Split View: Code + 3D Model on Right"
+              >
+                <Box className="w-3.5 h-3.5 text-blue-600" />
+                <span>Split + 3D Model</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('3d')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  viewMode === '3d' ? 'bg-white text-primary shadow-xs' : 'text-brand-muted hover:text-navy-900'
+                }`}
+                title="3D Model Full View"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>3D Model</span>
               </button>
             </div>
-          )}
+
+            {currentPractical && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setGuidedMode('guided')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    guidedMode === 'guided'
+                      ? 'bg-white text-primary shadow-xs'
+                      : 'text-brand-muted hover:text-navy-900'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Guided Practicals</span>
+                </button>
+                <button
+                  onClick={() => setGuidedMode('workspace')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    guidedMode === 'workspace'
+                      ? 'bg-white text-navy-900 shadow-xs'
+                      : 'text-brand-muted hover:text-navy-900'
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  <span>Workspace</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {guidedMode === 'guided' && currentPractical ? (
@@ -230,26 +339,52 @@ export const StudentLabDetail: React.FC = () => {
                 }}
               />
             </div>
-            <div className="lg:col-span-8 h-full">
-              <MonacoWorkspace
-                initialCode={mockWorkspaceCode}
-                language={currentPractical.defaultLanguage}
-                labTitle={mockLab.name}
-                onCodeChange={setMockWorkspaceCode}
-                onSubmitPractical={() => toast.success('Practical Evaluation Submitted!')}
-                isGuidedMode={true}
-              />
+            <div className="lg:col-span-8 h-full flex overflow-hidden gap-3">
+              {viewMode !== '3d' && (
+                <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+                  <MonacoWorkspace
+                    initialCode={mockWorkspaceCode}
+                    language={currentPractical.defaultLanguage}
+                    labTitle={mockLab.name}
+                    onCodeChange={setMockWorkspaceCode}
+                    onSubmitPractical={() => toast.success('Practical Evaluation Submitted!')}
+                    isGuidedMode={true}
+                  />
+                </div>
+              )}
+              {viewMode !== 'code' && (
+                <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+                  <Lab3DModelViewer
+                    key={`mock-guided-${mockLab.id}-${getModelPresetForLab(mockLab)}`}
+                    initialPreset={getModelPresetForLab(mockLab)}
+                    title={`${mockLab.name} — 3D Visualizer`}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
-          <div className="h-[760px]">
-            <MonacoWorkspace
-              initialCode={mockWorkspaceCode}
-              language={(mockLab.languages?.[0] as any) || 'python'}
-              labTitle={mockLab.name}
-              onCodeChange={setMockWorkspaceCode}
-              isGuidedMode={false}
-            />
+          <div className="h-[760px] flex overflow-hidden gap-3">
+            {viewMode !== '3d' && (
+              <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+                <MonacoWorkspace
+                  initialCode={mockWorkspaceCode}
+                  language={(mockLab.languages?.[0] as any) || 'python'}
+                  labTitle={mockLab.name}
+                  onCodeChange={setMockWorkspaceCode}
+                  isGuidedMode={false}
+                />
+              </div>
+            )}
+            {viewMode !== 'code' && (
+              <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+                <Lab3DModelViewer
+                  key={`mock-ws-${mockLab.id}-${getModelPresetForLab(mockLab)}`}
+                  initialPreset={getModelPresetForLab(mockLab)}
+                  title={`${mockLab.name} — 3D Workspace`}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -269,7 +404,9 @@ export const StudentLabDetail: React.FC = () => {
   if (loadError) {
     return (
       <div className="mx-auto flex min-h-[360px] max-w-xl flex-col items-center justify-center text-center">
-        <div className="mb-4 rounded-full bg-amber-50 p-3 text-amber-700"><AlertCircle className="h-6 w-6" /></div>
+        <div className="mb-4 rounded-full bg-amber-50 p-3 text-amber-700">
+          <AlertCircle className="h-6 w-6" />
+        </div>
         <h1 className="text-lg font-semibold text-navy-900">This lab could not be opened</h1>
         <p role="alert" className="mt-2 text-sm text-brand-muted">{loadError}</p>
         <div className="mt-5 flex gap-2">
@@ -283,7 +420,9 @@ export const StudentLabDetail: React.FC = () => {
   if (dbLab && (!dbLab.exercises || dbLab.exercises.length === 0)) {
     return (
       <div className="mx-auto flex min-h-[360px] max-w-xl flex-col items-center justify-center text-center">
-        <div className="mb-4 rounded-full bg-blue-50 p-3 text-primary"><BookOpen className="h-6 w-6" /></div>
+        <div className="mb-4 rounded-full bg-blue-50 p-3 text-primary">
+          <BookOpen className="h-6 w-6" />
+        </div>
         <h1 className="text-lg font-semibold text-navy-900">{dbLab.title}</h1>
         <p className="mt-2 text-sm text-brand-muted">This lab is published, but the instructor has not added any exercises yet.</p>
         <Button className="mt-5" variant="outline" onClick={() => navigate('/student/labs')}>Back to labs</Button>
@@ -300,51 +439,47 @@ export const StudentLabDetail: React.FC = () => {
     const runExerciseCode = async () => {
       setRunning(activeEx.id);
       try {
-        const data = await apiPost<any>('/execute', {
-            language: dbLab.language || 'python',
-            code: currentCode,
+        const res = await apiPost<{
+          stdout?: string;
+          stderr?: string;
+          timeMs?: number;
+          provider?: string;
+        }>('/execute', {
+          language: dbLab.language,
+          code: currentCode,
         });
-        const stdout = data.stdout || '';
-        const stderr = data.stderr || '';
         setOutputs((prev) => ({
           ...prev,
-          [activeEx.id]: { stdout, stderr, timeMs: data.timeMs, provider: data.provider },
+          [activeEx.id]: {
+            stdout: res.stdout || '',
+            stderr: res.stderr || '',
+            timeMs: res.timeMs,
+            provider: res.provider,
+          },
         }));
-
-        if (activeEx.expectedOutput && stdout.trim() === activeEx.expectedOutput.trim()) {
-          setCompleted((prev) => new Set([...prev, activeEx.id]));
-          toast.success('Exercise Completed!', 'Your output matches the expected result!');
-        } else if (!stderr && stdout) {
-          toast.info('Execution Complete', `Ran in ${data.timeMs || 25}ms`);
-        }
-      } catch (err: any) {
+      } catch (err) {
         setOutputs((prev) => ({
           ...prev,
-          [activeEx.id]: { stdout: '', stderr: err?.message || 'Execution request failed' },
+          [activeEx.id]: {
+            stdout: '',
+            stderr: err instanceof Error ? err.message : 'Execution failed.',
+          },
         }));
-        toast.error('Execution Failed');
       } finally {
         setRunning(null);
       }
     };
 
-    const monacoLang = (l: string) => {
-      const low = (l || '').toLowerCase();
-      if (low.includes('c++') || low === 'cpp') return 'cpp';
-      if (low.includes('python') || low === 'py') return 'python';
-      if (low.includes('sql')) return 'sql';
-      if (low.includes('java')) return 'java';
-      return 'python';
-    };
+    const monacoLang = (l: string) => (l === 'cpp' ? 'cpp' : l);
 
     return (
-      <div className="flex h-[800px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
-        {/* Left Exercise Navigation */}
-        <div className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+      <div className="flex h-[800px] bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+        {/* Left Exercises Sidebar */}
+        <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
           <div className="p-4 border-b border-slate-800">
             <button
               onClick={() => navigate('/student/labs')}
-              className="flex items-center gap-1.5 text-slate-400 hover:text-white mb-3 text-xs transition-colors"
+              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 mb-2.5 transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Labs
             </button>
@@ -396,15 +531,52 @@ export const StudentLabDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Workspace with Monaco and Terminal Console */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Right Workspace: Monaco Code Editor + 3D Interactive Model Panel */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Exercise Bar */}
-          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+          <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800 shrink-0 flex-wrap gap-2">
             <div>
               <h3 className="text-white font-bold text-sm">{activeEx.title}</h3>
               <p className="text-slate-400 text-xs mt-0.5">{activeEx.description}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* View Mode Toggle: Code, Split with 3D, or 3D Only */}
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('code')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                    viewMode === 'code' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Code Only"
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Code</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                    viewMode === 'split' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Split Screen: Code + 3D Model on Right"
+                >
+                  <Box className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="hidden sm:inline">Split (3D)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('3d')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                    viewMode === '3d' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="3D Model Full View"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">3D View</span>
+                </button>
+              </div>
+
               {activeEx.hints && activeEx.hints.length > 0 && (
                 <button
                   onClick={() => setShowHints(!showHints)}
@@ -453,76 +625,95 @@ export const StudentLabDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Monaco Code Editor */}
-          <div className="flex-1 overflow-hidden relative">
-            <MonacoEditor
-              height="100%"
-              language={monacoLang(dbLab.language)}
-              value={currentCode}
-              onChange={(val) => setCodes((prev) => ({ ...prev, [activeEx.id]: val || '' }))}
-              theme="vs-dark"
-              options={{
-                fontSize: 13,
-                minimap: { enabled: false },
-                automaticLayout: true,
-                wordWrap: 'on',
-                fontFamily: 'JetBrains Mono, monospace',
-              }}
-            />
-          </div>
-
-          {/* Always Visible Output Console */}
-          <div className="h-56 bg-slate-950 border-t border-slate-800 flex flex-col shrink-0">
-            <div className="flex items-center justify-between px-4 py-1.5 bg-slate-900 border-b border-slate-800 text-xs">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-3.5 h-3.5 text-brand-aqua" />
-                <span className="font-mono text-slate-300 font-semibold">Console Output</span>
-                {currentOut?.timeMs && (
-                  <span className="text-[10px] text-slate-500 font-mono">({currentOut.timeMs}ms)</span>
-                )}
-                {currentOut?.provider && (
-                  <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
-                    {currentOut.provider}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {activeEx.expectedOutput && (
-                  <span className="text-[11px] text-slate-400">
-                    Expected: <span className="font-mono text-slate-200">{activeEx.expectedOutput}</span>
-                  </span>
-                )}
-                <button
-                  onClick={() => setOutputs((prev) => ({ ...prev, [activeEx.id]: { stdout: '', stderr: '' } }))}
-                  className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 p-3 overflow-y-auto font-mono text-xs select-text">
-              {running === activeEx.id ? (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Executing program in sandbox...</span>
+          {/* Split / Unified Workspace View */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Portion: Code Editor & Console (Hidden if viewMode === '3d') */}
+            {viewMode !== '3d' && (
+              <div className={`flex flex-col h-full overflow-hidden min-w-0 ${viewMode === 'split' ? 'w-1/2 border-r border-slate-800' : 'w-full'}`}>
+                {/* Monaco Code Editor */}
+                <div className="flex-1 overflow-hidden relative">
+                  <MonacoEditor
+                    height="100%"
+                    language={monacoLang(dbLab.language)}
+                    value={currentCode}
+                    onChange={(val) => setCodes((prev) => ({ ...prev, [activeEx.id]: val || '' }))}
+                    theme="vs-dark"
+                    options={{
+                      fontSize: 13,
+                      minimap: { enabled: false },
+                      automaticLayout: true,
+                      wordWrap: 'on',
+                      fontFamily: 'JetBrains Mono, monospace',
+                    }}
+                  />
                 </div>
-              ) : currentOut ? (
-                <>
-                  {currentOut.stdout && (
-                    <pre className="text-emerald-400 whitespace-pre-wrap">{currentOut.stdout}</pre>
-                  )}
-                  {currentOut.stderr && (
-                    <pre className="text-rose-400 whitespace-pre-wrap mt-1">{currentOut.stderr}</pre>
-                  )}
-                  {!currentOut.stdout && !currentOut.stderr && (
-                    <p className="text-slate-600">[Program finished with no console output]</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-slate-600 italic">Click "Run Code" above to execute and inspect console output.</p>
-              )}
-            </div>
+
+                {/* Always Visible Output Console */}
+                <div className="h-56 bg-slate-950 border-t border-slate-800 flex flex-col shrink-0">
+                  <div className="flex items-center justify-between px-4 py-1.5 bg-slate-900 border-b border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="w-3.5 h-3.5 text-brand-aqua" />
+                      <span className="font-mono text-slate-300 font-semibold">Console Output</span>
+                      {currentOut?.timeMs && (
+                        <span className="text-[10px] text-slate-500 font-mono">({currentOut.timeMs}ms)</span>
+                      )}
+                      {currentOut?.provider && (
+                        <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
+                          {currentOut.provider}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeEx.expectedOutput && (
+                        <span className="text-[11px] text-slate-400">
+                          Expected: <span className="font-mono text-slate-200">{activeEx.expectedOutput}</span>
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setOutputs((prev) => ({ ...prev, [activeEx.id]: { stdout: '', stderr: '' } }))}
+                        className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 p-3 overflow-y-auto font-mono text-xs select-text">
+                    {running === activeEx.id ? (
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Executing program in sandbox...</span>
+                      </div>
+                    ) : currentOut ? (
+                      <>
+                        {currentOut.stdout && (
+                          <pre className="text-emerald-400 whitespace-pre-wrap">{currentOut.stdout}</pre>
+                        )}
+                        {currentOut.stderr && (
+                          <pre className="text-rose-400 whitespace-pre-wrap mt-1">{currentOut.stderr}</pre>
+                        )}
+                        {!currentOut.stdout && !currentOut.stderr && (
+                          <p className="text-slate-600">[Program finished with no console output]</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-slate-600 italic">Click "Run Code" above to execute and inspect console output.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Right Portion: Interactive 3D Model Viewer */}
+            {viewMode !== 'code' && (
+              <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+                <Lab3DModelViewer
+                  key={`db-${dbLab.id}-${getModelPresetForLab(dbLab)}`}
+                  initialPreset={getModelPresetForLab(dbLab)}
+                  title={`${dbLab.title} — 3D Laboratory Model`}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -531,13 +722,26 @@ export const StudentLabDetail: React.FC = () => {
 
   // Fallback: Open Workspace
   return (
-    <div className="h-[760px]">
-      <MonacoWorkspace
-        initialCode={`// LUMIO Virtual Laboratory Workspace\n// Write and execute code in any language\n\nprint("Hello from LUMIO!")\n`}
-        language="python"
-        labTitle="Virtual Sandbox Workspace"
-        isGuidedMode={false}
-      />
+    <div className="h-[760px] flex overflow-hidden gap-3">
+      {viewMode !== '3d' && (
+        <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+          <MonacoWorkspace
+            initialCode={`// LUMIO Virtual Laboratory Workspace\n// Write and execute code in any language\n\nprint("Hello from LUMIO!")\n`}
+            language="python"
+            labTitle="Virtual Sandbox Workspace"
+            isGuidedMode={false}
+          />
+        </div>
+      )}
+      {viewMode !== 'code' && (
+        <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+          <Lab3DModelViewer
+            key="fallback-viewer"
+            initialPreset="microcontroller"
+            title="Interactive 3D Hardware Explorer"
+          />
+        </div>
+      )}
     </div>
   );
 };

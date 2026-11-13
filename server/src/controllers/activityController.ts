@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
+import { syncNotificationToFirestore } from '../services/firebaseService';
+import { broadcastNotification } from '../sockets/collabSocket';
 
 export function recordAudit(req: AuthRequest, action: string, entityType: string, entityId: string | null, details = ''): void {
   const instituteId = req.user?.instituteId;
@@ -12,9 +14,37 @@ export function recordAudit(req: AuthRequest, action: string, entityType: string
   );
 }
 
-export function createNotification(userId: string, type: string, title: string, body: string, link: string | null = null): void {
-  db.prepare(`INSERT INTO notifications (id, user_id, type, title, body, link) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(uuid(), userId, type.slice(0, 60), title.slice(0, 160), body.slice(0, 1000), link);
+export function createNotification(
+  userId: string,
+  type: string,
+  title: string,
+  body: string,
+  link: string | null = null
+): { id: string; userId: string; type: string; title: string; body: string; link: string | null; created_at: string } {
+  const notifId = uuid();
+  const createdAt = new Date().toISOString();
+
+  db.prepare(`INSERT INTO notifications (id, user_id, type, title, body, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(notifId, userId, type.slice(0, 60), title.slice(0, 160), body.slice(0, 1000), link, createdAt);
+
+  const notifObj = {
+    id: notifId,
+    userId,
+    type,
+    title,
+    body,
+    link,
+    read_at: null,
+    created_at: createdAt,
+  };
+
+  // Asynchronously sync to Firebase Firestore
+  void syncNotificationToFirestore(notifObj);
+
+  // Real-time instant notification broadcast via Socket.IO
+  broadcastNotification(userId, notifObj);
+
+  return notifObj;
 }
 
 export function listAuditLogs(req: AuthRequest, res: Response): void {

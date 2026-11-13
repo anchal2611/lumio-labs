@@ -87,11 +87,30 @@ export function verifyFirebaseToken(req: AuthRequest, res: Response, next: NextF
 }
 
 export function verifyFirebaseTokenWhenPresent(req: AuthRequest, res: Response, next: NextFunction): void {
-  if (!req.headers.authorization) {
-    next(); // Legacy local authentication remains available when Firebase is not configured.
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    next(); // Legacy local authentication remains available when Firebase is not configured or no token sent.
     return;
   }
-  verifyFirebaseToken(req, res, next);
+  const token = authHeader.slice(7);
+  void firebaseAdminAuth.verifyIdToken(token)
+    .then((decoded) => {
+      if (!decoded.uid || !decoded.email) {
+        res.status(401).json({ error: 'Firebase account must have a verified email address.' });
+        return;
+      }
+      req.firebaseUser = { uid: decoded.uid, email: decoded.email, emailVerified: Boolean(decoded.email_verified) };
+      next();
+    })
+    .catch(() => {
+      // If Firebase verification fails but a password is provided (local registration fallback or stale token),
+      // allow local authentication to handle the request instead of failing with 401.
+      if (req.body?.password) {
+        next();
+        return;
+      }
+      res.status(401).json({ error: 'Invalid or expired Firebase ID token.' });
+    });
 }
 
 export function requireRole(roles: string[]) {

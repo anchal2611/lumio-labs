@@ -2,7 +2,15 @@ import path from 'path';
 import fs from 'fs';
 
 // ─── Setup storage path ───────────────────────────────────────────────────────
-const dbDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+function resolveDataDir(): string {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  const rootData = path.resolve(__dirname, '../../../data');
+  const serverData = path.resolve(__dirname, '../../data');
+  if (fs.existsSync(rootData)) return rootData;
+  if (fs.existsSync(serverData)) return serverData;
+  return path.resolve(process.cwd(), 'data');
+}
+const dbDir = resolveDataDir();
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 const dbPath = path.join(dbDir, 'lumio.db');
 

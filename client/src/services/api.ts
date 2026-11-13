@@ -43,36 +43,67 @@ async function tryRefresh(): Promise<string | null> {
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  let token = await getAuthToken();
+  const isAuthAction = path.startsWith('/auth/login') || path.startsWith('/auth/register');
+  let token: string | null = null;
+  if (isAuthAction) {
+    if (firebaseAuth?.currentUser) {
+      try {
+        token = await firebaseAuth.currentUser.getIdToken();
+      } catch {
+        token = null;
+      }
+    }
+  } else {
+    token = await getAuthToken();
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  let res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
-
-  // Auto-refresh on 401
-  if (res.status === 401 && firebaseAuth?.currentUser) {
-    token = await firebaseAuth.currentUser.getIdToken(true);
-    headers['Authorization'] = `Bearer ${token}`;
+  let res: Response;
+  try {
     res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
-  } else if (res.status === 401 && getRefreshToken()) {
-    token = await tryRefresh();
-    if (token) {
+  } catch {
+    throw new Error('Unable to connect to the backend server. Please make sure the server is running on port 5000 (npm run dev:server).');
+  }
+
+  // Auto-refresh on 401 (skip for login requests)
+  if (path !== '/auth/login') {
+    if (res.status === 401 && firebaseAuth?.currentUser) {
+      token = await firebaseAuth.currentUser.getIdToken(true);
       headers['Authorization'] = `Bearer ${token}`;
-      res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
+      try {
+        res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
+      } catch { /* ignore retry failure */ }
+    } else if (res.status === 401 && getRefreshToken()) {
+      token = await tryRefresh();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        try {
+          res = await fetch(`${config.apiBaseUrl}${path}`, { ...options, headers });
+        } catch { /* ignore retry failure */ }
+      }
     }
   }
 
   return res;
 }
 
+function parseApiError(res: Response, errData?: any): string {
+  if (res.status === 502 || res.status === 504) {
+    return 'Backend server is not reachable. Please start the server using: npm run dev:server';
+  }
+  return errData?.error || (res.status === 401 ? 'Invalid email or password.' : `Request failed (HTTP ${res.status})`);
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await apiFetch(path);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const err = await res.json().catch(() => null);
+    throw new Error(parseApiError(res, err));
   }
   return res.json();
 }
@@ -83,8 +114,8 @@ export async function apiPost<T>(path: string, body?: any): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const err = await res.json().catch(() => null);
+    throw new Error(parseApiError(res, err));
   }
   return res.json();
 }
@@ -95,8 +126,8 @@ export async function apiPut<T>(path: string, body?: any): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const err = await res.json().catch(() => null);
+    throw new Error(parseApiError(res, err));
   }
   return res.json();
 }
@@ -104,8 +135,8 @@ export async function apiPut<T>(path: string, body?: any): Promise<T> {
 export async function apiDelete<T>(path: string): Promise<T> {
   const res = await apiFetch(path, { method: 'DELETE' });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const err = await res.json().catch(() => null);
+    throw new Error(parseApiError(res, err));
   }
   return res.json();
 }
@@ -116,8 +147,8 @@ export async function apiPatch<T>(path: string, body?: any): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const err = await res.json().catch(() => null);
+    throw new Error(parseApiError(res, err));
   }
   return res.json();
 }

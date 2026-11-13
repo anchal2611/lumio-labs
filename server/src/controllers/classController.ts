@@ -2,7 +2,9 @@ import { Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
-import { recordAudit } from './activityController';
+import { recordAudit, createNotification } from './activityController';
+import { syncClassToFirestore } from '../services/firebaseService';
+import { getCollabIo } from '../sockets/collabSocket';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -56,6 +58,56 @@ export function createClass(req: AuthRequest, res: Response): void {
 
     const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId) as any;
     recordAudit(req, 'class.created', 'class', classId, `Created class "${name.trim()}" (${subject.trim()}) for teacher ${teacherId}.`);
+
+    // Sync class to Firebase Firestore
+    void syncClassToFirestore({
+      id: classId,
+      name: name.trim(),
+      subject: subject.trim(),
+      description: description?.trim() || null,
+      join_code: joinCode,
+      teacher_id: teacherId,
+      institute_id: req.user!.instituteId || null,
+      banner_color: bannerColor || '#2563EB',
+      created_at: cls.created_at || new Date().toISOString(),
+    });
+
+    // Notify active students in the institute
+    try {
+      const students = req.user!.instituteId
+        ? (db.prepare("SELECT id FROM users WHERE role = 'student' AND status = 'active' AND institute_id = ?").all(req.user!.instituteId) as any[])
+        : (db.prepare("SELECT id FROM users WHERE role = 'student' AND status = 'active'").all() as any[]);
+
+      for (const student of students) {
+        createNotification(
+          student.id,
+          'class_created',
+          'New Class Created',
+          `Teacher created new class: "${name.trim()}" (${subject.trim()}). Join code: ${joinCode}`,
+          '/classes'
+        );
+      }
+    } catch (notifErr) {
+      console.warn('Failed to notify students of new class:', notifErr);
+    }
+
+    // Broadcast real-time Socket.IO event to all connected users
+    try {
+      const io = getCollabIo();
+      if (io) {
+        io.emit('class_created', {
+          classId,
+          name: name.trim(),
+          subject: subject.trim(),
+          joinCode,
+          teacherId,
+          instituteId: req.user!.instituteId,
+        });
+      }
+    } catch (socketErr) {
+      console.warn('Failed to emit class_created socket event:', socketErr);
+    }
+
     res.status(201).json({ ...cls, joinCode });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create class.' });

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { apiGet, apiPatch } from '../../services/api';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 type NavbarNotification = { id: string; title: string; body: string; link?: string | null; read_at?: string | null; created_at: string };
 
@@ -22,7 +23,7 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [notifications, setNotifications] = useState<NavbarNotification[]>([]);
+  const { notifications, unreadCount, markAllAsRead, openNotification: markNotificationRead } = useNotifications();
   const unreadNotifs = notifications.filter((notification) => !notification.read_at);
 
   const getDashboardPath = () => {
@@ -37,30 +38,12 @@ export const Navbar: React.FC = () => {
     navigate('/');
   };
 
-  const loadNotifications = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await apiGet<{ notifications: NavbarNotification[] }>('/notifications?limit=20');
-      setNotifications(data.notifications || []);
-    } catch { /* The page shows request errors; keep the navbar unobtrusive. */ }
-  }, [user]);
-  useEffect(() => {
-    void loadNotifications();
-    if (!user) return;
-    const timer = window.setInterval(() => void loadNotifications(), 30000);
-    return () => window.clearInterval(timer);
-  }, [loadNotifications, user]);
-
   const markAllNotificationsRead = async () => {
-    try { await apiPatch('/notifications/read-all'); await loadNotifications(); }
-    catch { /* The notification center provides the actionable error state. */ }
+    await markAllAsRead();
   };
 
-  const openNotification = async (notification: NavbarNotification) => {
-    if (!notification.read_at) {
-      await apiPatch(`/notifications/${encodeURIComponent(notification.id)}/read`).catch(() => {});
-      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item));
-    }
+  const openNotification = async (notification: any) => {
+    await markNotificationRead(notification);
     setShowNotifMenu(false);
     navigate(notification.link || `/${role}/notifications`);
   };
