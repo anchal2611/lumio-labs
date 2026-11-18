@@ -25,6 +25,8 @@ services:
         generateValue: true      # Render auto-generates a secure random value
       - key: DATA_DIR
         value: ./data            # Free instances have ephemeral local storage
+      - key: REMOTE_DATABASE_PERSISTENCE
+        value: "true"            # Restore and checkpoint SQLite snapshots in Firestore
       - key: FIREBASE_PROJECT_ID
         value: lumio-e3c95
       - key: FIREBASE_SERVICE_ACCOUNT_JSON

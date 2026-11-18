@@ -3,6 +3,7 @@ dotenv.config();
 
 export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
+  remoteDatabasePersistence: process.env.REMOTE_DATABASE_PERSISTENCE === 'true',
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || 'lumio-e3c95',
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',

@@ -64,14 +64,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       if (firebaseAuth) {
+        let firebaseSignInSucceeded = false;
         try {
           await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
-          const profile = await apiGet<UserProfile>('/auth/me');
+          firebaseSignInSucceeded = true;
+        } catch (fbErr) {
+          console.warn('Firebase login failed, attempting local authentication fallback:', fbErr);
+        }
+
+        if (firebaseSignInSucceeded) {
+          let profile: UserProfile;
+          try {
+            profile = await apiGet<UserProfile>('/auth/me');
+          } catch (profileErr: any) {
+            if (profileErr instanceof Error && /user not found|account profile not found/i.test(profileErr.message)) {
+              throw new Error('Firebase recognized your account, but this deployment could not find its LUMIO profile. Your Firebase sign-in still exists. The app database snapshot may be missing or not configured; ask the administrator to check Firestore persistence or restore a database backup. Do not create another Firebase account.');
+            }
+            throw profileErr;
+          }
           setUser(profile);
           localStorage.setItem(USER_KEY, JSON.stringify(profile));
           return;
-        } catch (fbErr) {
-          console.warn('Firebase login failed, attempting local authentication fallback:', fbErr);
         }
       }
       const res: any = await apiPost('/auth/login', data);

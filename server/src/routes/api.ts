@@ -27,15 +27,19 @@ import { config, isPublicJudge0Endpoint } from '../config/env';
 import { listAuditLogs, listNotifications, markAllNotificationsRead, markNotificationRead } from '../controllers/activityController';
 import { getConversationMessages, listConversations, listMessageContacts, sendMessage } from '../controllers/messageController';
 import { createResource, deleteResource, listResources } from '../controllers/resourceController';
+import { getDatabasePersistenceStatus } from '../db/database';
 
 export const apiRouter = Router();
 
 // ─── Health ──────────────────────────────────────────
 apiRouter.get('/health', (_req, res) => {
+  const persistence = getDatabasePersistenceStatus();
   res.json({
     status: 'ok', service: 'LUMIO Platform API v2', timestamp: new Date().toISOString(), version: '2.0.0',
     firebaseAdminConfigured: hasFirebaseAdminCredentials,
     codeExecutionConfigured: Boolean(config.judge0.apiKey) || isPublicJudge0Endpoint(),
+    databasePersistence: persistence.mode,
+    databasePersistenceHealthy: !persistence.error,
   });
 });
 

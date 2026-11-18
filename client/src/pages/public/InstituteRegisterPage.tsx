@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Building2, User, Globe, CheckCircle2, Plus, X, Loader2, FlaskConical, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Globe, Loader2, Plus, User, X } from 'lucide-react';
 import { apiPost } from '../../services/api';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth, saveFirebaseUserProfile } from '../../services/firebase';
+import { PublicAuthLayout } from '../../components/layout/PublicAuthLayout';
 
-const STEPS = ['Institute Details', 'Admin Account', 'Email Domains', 'Complete'];
+const STEPS = ['Institute', 'Admin account', 'Email domains'];
+const fieldClass = 'mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-sm text-navy-900 outline-none transition placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/15';
 
 export const InstituteRegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,27 +22,27 @@ export const InstituteRegisterPage: React.FC = () => {
     emailDomains: [] as string[],
   });
 
-  const update = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
+  const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   const addDomain = () => {
-    const d = domainInput.trim().toLowerCase().replace(/^@/, '');
-    if (d && !form.emailDomains.includes(d)) {
-      setForm(f => ({ ...f, emailDomains: [...f.emailDomains, d] }));
+    const domain = domainInput.trim().toLowerCase().replace(/^@/, '');
+    if (domain && !form.emailDomains.includes(domain)) {
+      setForm((current) => ({ ...current, emailDomains: [...current.emailDomains, domain] }));
       setDomainInput('');
     }
   };
 
-  const removeDomain = (d: string) => setForm(f => ({ ...f, emailDomains: f.emailDomains.filter(x => x !== d) }));
+  const removeDomain = (domain: string) => setForm((current) => ({ ...current, emailDomains: current.emailDomains.filter((item) => item !== domain) }));
 
   const nextStep = () => {
     setError(null);
-    if (step === 0 && !form.instituteName) { setError('Institute name is required.'); return; }
+    if (step === 0 && !form.instituteName.trim()) { setError('Enter your institute name.'); return; }
     if (step === 1) {
-      if (!form.adminName || !form.adminEmail || !form.adminPassword) { setError('All admin fields are required.'); return; }
+      if (!form.adminName.trim() || !form.adminEmail.trim() || !form.adminPassword) { setError('Complete all admin account fields.'); return; }
       if (form.adminPassword !== form.confirmPassword) { setError('Passwords do not match.'); return; }
-      if (form.adminPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+      if (form.adminPassword.length < 6) { setError('Use a password with at least 6 characters.'); return; }
     }
-    setStep(s => s + 1);
+    setStep((current) => current + 1);
   };
 
   const handleSubmit = async () => {
@@ -56,180 +58,170 @@ export const InstituteRegisterPage: React.FC = () => {
           firebaseUser = (await signInWithEmailAndPassword(firebaseAuth, form.adminEmail, form.adminPassword)).user;
         }
       }
-      const res = await apiPost<any>('/institutes/register', {
-        instituteName: form.instituteName,
+      const response = await apiPost<any>('/institutes/register', {
+        instituteName: form.instituteName.trim(),
         type: form.type,
-        city: form.city,
-        website: form.website,
-        adminName: form.adminName,
-        adminEmail: form.adminEmail,
+        city: form.city.trim(),
+        website: form.website.trim(),
+        adminName: form.adminName.trim(),
+        adminEmail: form.adminEmail.trim(),
         ...(firebaseUser ? {} : { adminPassword: form.adminPassword }),
         emailDomains: form.emailDomains,
       });
       if (firebaseUser) {
-        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: form.adminName, email: form.adminEmail }).catch(() => {});
+        await saveFirebaseUserProfile({ uid: firebaseUser.uid, name: form.adminName.trim(), email: form.adminEmail.trim() }).catch(() => {});
       }
-      setResult(res);
+      setResult(response);
       setStep(3);
-    } catch (e: any) {
-      setError(e.message || 'Registration failed.');
+    } catch (err: any) {
+      setError(err.message || 'Institute registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls = 'w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all';
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex items-center justify-center p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
+    <PublicAuthLayout panelTitle="Bring your institute's lab work together." panelDescription="Set up your campus workspace, connect student email domains, and give faculty a place to publish practicals.">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Institute onboarding</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-tight text-navy-900">Register your institute</h2>
+        <p className="mt-1.5 text-sm leading-5 text-brand-muted">Create the institute and its first administrator account.</p>
       </div>
-      <div className="relative w-full max-w-xl">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-500/30"><FlaskConical className="w-6 h-6 text-blue-400" /></div>
-            <span className="text-2xl font-black text-white">LUMIO</span>
+
+      {step < 3 && (
+        <ol aria-label="Registration progress" className="mt-6 grid grid-cols-3 gap-2">
+          {STEPS.map((label, index) => (
+            <li key={label} aria-current={index === step ? 'step' : undefined} className="min-w-0">
+              <div className={`flex items-center gap-2 border-t-2 pt-2.5 ${index <= step ? 'border-primary text-primary' : 'border-slate-200 text-slate-400'}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${index < step ? 'bg-primary text-white' : index === step ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-500'}`}>
+                  {index < step ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : index + 1}
+                </span>
+                <span className="truncate text-[11px] font-semibold sm:text-xs">{label}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {error && <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm leading-5 text-red-700">{error}</div>}
+
+      {step === 0 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-navy-900"><Building2 className="h-4 w-4 text-primary" aria-hidden="true" /> Institute details</h3>
+          <div>
+            <label htmlFor="institute-name" className="block text-sm font-medium text-navy-900">Institute name</label>
+            <input id="institute-name" value={form.instituteName} onChange={(event) => update('instituteName', event.target.value)} className={fieldClass} placeholder="North Valley University" autoComplete="organization" />
           </div>
-          <h2 className="text-slate-400 text-sm">Register Your Institute</h2>
-        </div>
-
-        {/* Stepper */}
-        {step < 3 && (
-          <div className="flex items-center justify-center gap-2 mb-6">
-            {STEPS.slice(0, 3).map((s, i) => (
-              <React.Fragment key={i}>
-                <div className={`flex items-center gap-1.5 ${ i < step ? 'text-emerald-400' : i === step ? 'text-blue-400' : 'text-slate-600' }`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${ i < step ? 'bg-emerald-500/20 border-emerald-500/50' : i === step ? 'bg-blue-500/20 border-blue-500/50' : 'bg-slate-800 border-slate-700' }`}>
-                    {i < step ? '✓' : i + 1}
-                  </div>
-                  <span className="text-xs hidden sm:block">{s}</span>
-                </div>
-                {i < 2 && <div className={`flex-1 h-px max-w-8 ${ i < step ? 'bg-emerald-500/50' : 'bg-slate-700' }`} />}
-              </React.Fragment>
-            ))}
+          <div>
+            <label htmlFor="institute-type" className="block text-sm font-medium text-navy-900">Institute type</label>
+            <select id="institute-type" value={form.type} onChange={(event) => update('type', event.target.value)} className={`${fieldClass} appearance-none`}>
+              {['university', 'college', 'school', 'research_institute'].map((type) => <option key={type} value={type}>{type.replace('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())}</option>)}
+            </select>
           </div>
-        )}
-
-        <div className="bg-slate-900/70 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
-          {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">{error}</div>}
-
-          {step === 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2"><Building2 className="w-5 h-5 text-blue-400" /> Institute Details</h3>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Institute Name *</label>
-                <input value={form.instituteName} onChange={e => update('instituteName', e.target.value)} className={inputCls} placeholder="Indian Institute of Technology Delhi" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Type</label>
-                <select value={form.type} onChange={e => update('type', e.target.value)} className={inputCls}>
-                  {['university', 'college', 'school', 'research_institute'].map(t => <option key={t} value={t}>{t.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1.5">City</label>
-                  <input value={form.city} onChange={e => update('city', e.target.value)} className={inputCls} placeholder="New Delhi" />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1.5">Website</label>
-                  <input value={form.website} onChange={e => update('website', e.target.value)} className={inputCls} placeholder="https://iit.ac.in" />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="institute-city" className="block text-sm font-medium text-navy-900">City <span className="font-normal text-slate-400">(optional)</span></label>
+              <input id="institute-city" value={form.city} onChange={(event) => update('city', event.target.value)} className={fieldClass} placeholder="City" autoComplete="address-level2" />
             </div>
-          )}
-
-          {step === 1 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2"><User className="w-5 h-5 text-blue-400" /> Admin Account</h3>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Admin Name *</label>
-                <input value={form.adminName} onChange={e => update('adminName', e.target.value)} className={inputCls} placeholder="Dr. Rajan Kumar" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Admin Email *</label>
-                <input type="email" value={form.adminEmail} onChange={e => update('adminEmail', e.target.value)} className={inputCls} placeholder="admin@iit.ac.in" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Password *</label>
-                <input type="password" value={form.adminPassword} onChange={e => update('adminPassword', e.target.value)} className={inputCls} placeholder="Min 6 characters" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1.5">Confirm Password *</label>
-                <input type="password" value={form.confirmPassword} onChange={e => update('confirmPassword', e.target.value)} className={inputCls} placeholder="Re-enter password" />
-              </div>
+            <div>
+              <label htmlFor="institute-website" className="block text-sm font-medium text-navy-900">Website <span className="font-normal text-slate-400">(optional)</span></label>
+              <input id="institute-website" type="url" value={form.website} onChange={(event) => update('website', event.target.value)} className={fieldClass} placeholder="https://example.edu" autoComplete="url" />
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2"><Globe className="w-5 h-5 text-blue-400" /> Email Domains</h3>
-              <p className="text-sm text-slate-400">Students who register with your institute email domain will be automatically enrolled. Add all your institute's email domains.</p>
-              <div className="flex gap-2">
-                <input
-                  value={domainInput}
-                  onChange={e => setDomainInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDomain())}
-                  className={`${inputCls} flex-1`}
-                  placeholder="iit.ac.in"
-                />
-                <button onClick={addDomain} className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors">
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-              {form.emailDomains.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {form.emailDomains.map(d => (
-                    <span key={d} className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg px-3 py-1.5 text-sm">
-                      @{d}
-                      <button onClick={() => removeDomain(d)} className="text-blue-400 hover:text-red-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-600 italic">No domains added yet. You can skip this and add them from Admin Settings later.</p>
-              )}
-            </div>
-          )}
+      {step === 1 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-navy-900"><User className="h-4 w-4 text-primary" aria-hidden="true" /> Admin account</h3>
+          <div>
+            <label htmlFor="admin-name" className="block text-sm font-medium text-navy-900">Administrator name</label>
+            <input id="admin-name" value={form.adminName} onChange={(event) => update('adminName', event.target.value)} className={fieldClass} placeholder="Your full name" autoComplete="name" />
+          </div>
+          <div>
+            <label htmlFor="admin-email" className="block text-sm font-medium text-navy-900">Administrator email</label>
+            <input id="admin-email" type="email" value={form.adminEmail} onChange={(event) => update('adminEmail', event.target.value)} className={fieldClass} placeholder="admin@example.edu" autoComplete="email" />
+          </div>
+          <div>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-navy-900">Password</label>
+            <input id="admin-password" type="password" value={form.adminPassword} onChange={(event) => update('adminPassword', event.target.value)} className={fieldClass} placeholder="At least 6 characters" autoComplete="new-password" />
+          </div>
+          <div>
+            <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-navy-900">Confirm password</label>
+            <input id="admin-confirm-password" type="password" value={form.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} className={fieldClass} placeholder="Enter the password again" autoComplete="new-password" />
+          </div>
+        </div>
+      )}
 
-          {step === 3 && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-9 h-9 text-emerald-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Institute Registered!</h3>
-              <p className="text-slate-400 text-sm mb-1"><strong className="text-white">{result?.institute?.name}</strong> is now on LUMIO.</p>
-              <p className="text-slate-500 text-sm mb-6">Log in with your admin account to get started.</p>
-              <button onClick={() => navigate('/login')} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-all">Go to Login</button>
-            </div>
-          )}
-
-          {step < 3 && (
-            <div className="flex gap-3 mt-6">
-              {step > 0 && (
-                <button onClick={() => setStep(s => s - 1)} className="flex items-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all">
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </button>
-              )}
-              {step < 2 ? (
-                <button onClick={nextStep} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-all">
-                  Next <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button onClick={handleSubmit} disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold py-3 rounded-xl transition-all">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                  {loading ? 'Registering...' : 'Register Institute'}
-                </button>
-              )}
-            </div>
+      {step === 2 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-navy-900"><Globe className="h-4 w-4 text-primary" aria-hidden="true" /> Student email domains</h3>
+          <p className="text-sm leading-5 text-brand-muted">Students using these domains will be linked to your institute and can see its starter labs. You can also add domains later in Institute settings.</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={domainInput}
+              onChange={(event) => setDomainInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addDomain(); } }}
+              className={`${fieldClass} mt-0 min-w-0 flex-1`}
+              placeholder="example.edu"
+              aria-label="Student email domain"
+            />
+            <button type="button" onClick={addDomain} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-navy-900 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/30">
+              <Plus className="h-4 w-4" aria-hidden="true" /> Add domain
+            </button>
+          </div>
+          {form.emailDomains.length ? (
+            <ul className="flex flex-wrap gap-2" aria-label="Added email domains">
+              {form.emailDomains.map((domain) => (
+                <li key={domain} className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm text-blue-800">
+                  @{domain}
+                  <button type="button" onClick={() => removeDomain(domain)} aria-label={`Remove ${domain}`} className="inline-flex h-5 w-5 items-center justify-center rounded-full text-blue-700 transition hover:bg-blue-100 hover:text-red-700">
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs leading-5 text-brand-muted">No domains added. Students can still be connected through class enrollment.</p>
           )}
         </div>
-        <div className="mt-4 text-center">
-          <Link to="/login" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Back to Login</Link>
+      )}
+
+      {step === 3 && (
+        <div className="py-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-7 w-7" aria-hidden="true" />
+          </div>
+          <h3 className="mt-4 text-xl font-bold tracking-tight text-navy-900">Institute registered</h3>
+          <p className="mt-2 text-sm leading-6 text-brand-muted"><strong className="text-navy-900">{result?.institute?.name}</strong> is ready in LUMIO.</p>
+          <p className="mt-1 text-sm leading-6 text-brand-muted">Starter labs have been added. Sign in with the administrator account to continue.</p>
+          <button type="button" onClick={() => navigate('/login')} className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2">
+            Go to sign in <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
-      </div>
-    </div>
+      )}
+
+      {step < 3 && (
+        <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          {step > 0 ? (
+            <button type="button" onClick={() => { setError(null); setStep((current) => current - 1); }} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-navy-900 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/30">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back
+            </button>
+          ) : <span />}
+          {step < 2 ? (
+            <button type="button" onClick={nextStep} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 sm:min-w-32">
+              Continue <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : (
+            <button type="button" onClick={handleSubmit} disabled={loading} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-48">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+              {loading ? 'Registering…' : 'Register institute'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <p className="mt-6 border-t border-slate-200 pt-5 text-center text-sm text-brand-muted">Already have an account? <Link to="/login" className="font-semibold text-primary hover:text-primary-dark">Sign in</Link></p>
+    </PublicAuthLayout>
   );
 };

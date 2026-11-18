@@ -118,7 +118,7 @@ export const Navbar: React.FC = () => {
             </button>
 
             {showNotifMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-floating border border-slate-200 p-3 z-50 animate-fade-in">
+              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 bg-white rounded-xl shadow-floating border border-slate-200 p-3 z-50 animate-fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
                   <h4 className="text-xs font-bold text-navy-900">Notifications</h4>
                   <button type="button" disabled={!unreadNotifs.length} onClick={() => void markAllNotificationsRead()} className="text-[11px] font-medium text-primary disabled:cursor-default disabled:text-slate-400">Mark all read</button>

@@ -54,11 +54,6 @@ export function createLab(req: AuthRequest, res: Response): void {
     if (!exercisesWithIds) { res.status(400).json({ error: 'Exercise fields are invalid or exceed the allowed limits.' }); return; }
 
     let ownerId = req.user!.userId;
-    // Admin-created labs must be attached to a class so enrolled students can discover them.
-    if (req.user!.role === 'admin' && !classId) {
-      res.status(400).json({ error: 'Choose an institute class for this lab.' });
-      return;
-    }
     if (classId) {
       const cls = req.user!.role === 'admin'
         ? db.prepare('SELECT id, teacher_id FROM classes WHERE id = ? AND institute_id = ?').get(classId, req.user!.instituteId) as any
@@ -136,11 +131,11 @@ export function listLabs(req: AuthRequest, res: Response): void {
       LEFT JOIN class_enrollments ce ON ce.class_id = c.id AND ce.student_id = ?
       WHERE lm.is_published = 1 AND (
         ce.student_id IS NOT NULL 
-        OR lm.class_id IS NULL 
+        OR (lm.class_id IS NULL AND (u.institute_id = ? OR u.institute_id IS NULL))
         OR (u.institute_id = ? AND ? IS NOT NULL)
       )
     `;
-    const params: any[] = [user.userId, user.instituteId, user.instituteId];
+    const params: any[] = [user.userId, user.instituteId, user.instituteId, user.instituteId];
     if (classId) {
       query += ' AND lm.class_id = ?';
       params.push(classId);
@@ -186,6 +181,9 @@ export function getLab(req: AuthRequest, res: Response): void {
         res.status(403).json({ error: 'You are not enrolled in the class this lab belongs to.' });
         return;
       }
+    } else if (lab.teacher_institute_id && lab.teacher_institute_id !== req.user!.instituteId) {
+      res.status(403).json({ error: 'This institute-wide lab is not available to your institute.' });
+      return;
     }
   } else if (req.user!.role === 'teacher' && lab.teacher_id !== req.user!.userId) {
     res.status(403).json({ error: 'You do not have access to this lab.' });
@@ -229,10 +227,6 @@ export function updateLab(req: AuthRequest, res: Response): void {
   if (classId !== undefined && classId !== null && typeof classId !== 'string') { res.status(400).json({ error: 'Choose a valid class.' }); return; }
   if (isPublished !== undefined && typeof isPublished !== 'boolean') { res.status(400).json({ error: 'Lab visibility must be true or false.' }); return; }
   const nextClassId = classId === '' ? null : (classId ?? lab.class_id);
-  if (req.user!.role === 'admin' && !nextClassId) {
-    res.status(400).json({ error: 'Institute labs must remain assigned to a class.' });
-    return;
-  }
   let nextTeacherId = lab.teacher_id;
   if (nextClassId && nextClassId !== lab.class_id) {
     const cls = req.user!.role === 'admin'

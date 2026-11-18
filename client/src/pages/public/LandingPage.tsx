@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Binary,
   BookOpenCheck,
+  BookOpen,
   Braces,
   Building2,
   Check,
@@ -12,6 +13,7 @@ import {
   Database,
   FlaskConical,
   Globe,
+  GraduationCap,
   Layers3,
   Network,
   UsersRound,
@@ -122,8 +124,9 @@ export const LandingPage: React.FC = () => {
             <span className="text-lg font-extrabold tracking-tight text-navy-900">{config.appName}</span>
           </Link>
 
-          <nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm font-medium text-brand-muted md:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-6 text-sm font-medium text-brand-muted lg:flex">
             <a href="#labs" className="transition hover:text-primary">Labs</a>
+            <a href="#portals" className="transition hover:text-primary">For each role</a>
             <a href="#collaboration" className="transition hover:text-primary">Collaboration</a>
             <a href="#how-it-works" className="transition hover:text-primary">How it works</a>
           </nav>
@@ -263,6 +266,21 @@ export const LandingPage: React.FC = () => {
           </div>
         </section>
 
+        <section id="portals" className="scroll-mt-20 border-y border-slate-200/80 bg-brand-canvas px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto mb-10 max-w-2xl text-center">
+              <Badge variant="primary" size="sm">A quick look inside</Badge>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">One platform, three connected workspaces</h2>
+              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">See the tools each part of your campus uses to keep practical work moving.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <PortalPreview icon={Building2} eyebrow="Institute" title="A clearer campus overview" description="Organize people, classes, lab access, and institute settings from one place." modules={['User directory', 'Institute classes', 'Lab configuration']} action={isAuthenticated && role === 'admin' ? 'Open institute dashboard' : 'Register an institute'} to={isAuthenticated && role === 'admin' ? dashboardPaths.admin : '/institute/register'} />
+              <PortalPreview icon={BookOpen} eyebrow="Faculty" title="Practical work your class can follow" description="Publish lab modules, set assignments, review submissions, and guide students." modules={['My classes', 'Lab modules', 'Assignments & grading']} action={isAuthenticated && role === 'teacher' ? 'Open faculty workspace' : 'Faculty sign in'} to={isAuthenticated && role === 'teacher' ? dashboardPaths.teacher : '/login'} />
+              <PortalPreview icon={GraduationCap} eyebrow="Student" title="A workspace for each practical" description="Open class labs, work through exercises, submit assignments, and collaborate." modules={['My classes', 'Guided labs', 'Assignments & collaboration']} action={isAuthenticated && role === 'student' ? 'Open student workspace' : 'Create student account'} to={isAuthenticated && role === 'student' ? dashboardPaths.student : '/register'} />
+            </div>
+          </div>
+        </section>
+
         <section id="labs" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -279,8 +297,16 @@ export const LandingPage: React.FC = () => {
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {allLabs.map((lab) => <LabCard key={lab.id} lab={lab} />)}
+              <Link to={browsePath} className="group flex h-full min-h-64 flex-col justify-between rounded-xl border border-dashed border-blue-200 bg-blue-50/70 p-5 transition hover:border-primary hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 sm:p-6">
+                <div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-white text-primary shadow-subtle"><FlaskConical className="h-5 w-5" aria-hidden="true" /></div>
+                  <h3 className="mt-5 text-base font-bold text-navy-900">Your institute’s labs</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-brand-muted">Open the labs shared with your classes and continue into your workspace.</p>
+                </div>
+                <span className="mt-5 inline-flex items-center gap-2 border-t border-blue-100 pt-4 text-sm font-semibold text-primary group-hover:text-primary-dark">{isAuthenticated ? 'Browse your labs' : 'Sign in to browse'}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
+              </Link>
             </div>
           </div>
         </section>
@@ -302,7 +328,7 @@ export const LandingPage: React.FC = () => {
         </section>
 
         <section id="collaboration" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-          <div className="mx-auto grid max-w-7xl items-center gap-10 rounded-2xl bg-navy-950 px-6 py-8 text-white sm:px-10 sm:py-10 lg:grid-cols-[1fr_auto] lg:gap-14">
+          <div className="mx-auto max-w-7xl rounded-2xl bg-navy-950 px-6 py-8 text-white sm:px-10 sm:py-10">
             <div>
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-cyan-200">
                 <UsersRound className="h-5 w-5" aria-hidden="true" />
@@ -317,18 +343,18 @@ export const LandingPage: React.FC = () => {
                 <span className="inline-flex items-center gap-2"><BookOpenCheck className="h-4 w-4 text-cyan-200" aria-hidden="true" />Faculty guidance</span>
                 <span className="inline-flex items-center gap-2"><Code2 className="h-4 w-4 text-cyan-200" aria-hidden="true" />Shared workspaces</span>
               </div>
-            </div>
-            <div className="flex flex-col items-start gap-3 lg:items-end">
-              {isAuthenticated ? (
-                <Link to={role === 'admin' ? dashboardPaths.admin : `${role === 'teacher' ? '/teacher' : '/student'}/collaboration`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
-                  {role === 'admin' ? 'Go to dashboard' : 'Open collaboration'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              ) : (
-                <Link to="/student/collaboration" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
-                  Sign in to collaborate <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              )}
-              {!isAuthenticated && <Link to="/register" className="text-sm font-medium text-slate-300 underline decoration-slate-500 underline-offset-4 hover:text-white">Create a student account</Link>}
+              <div className="mt-7 flex flex-wrap items-center gap-3">
+                {isAuthenticated ? (
+                  <Link to={role === 'admin' ? dashboardPaths.admin : `${role === 'teacher' ? '/teacher' : '/student'}/collaboration`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
+                    {role === 'admin' ? 'Go to dashboard' : 'Open collaboration'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <Link to="/student/collaboration" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
+                    Sign in to your workspace <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                )}
+                {!isAuthenticated && <Link to="/register" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">Create a student account</Link>}
+              </div>
             </div>
           </div>
         </section>
@@ -357,6 +383,55 @@ export const LandingPage: React.FC = () => {
     </div>
   );
 };
+
+function PortalPreview({
+  icon: Icon,
+  eyebrow,
+  title,
+  description,
+  modules,
+  action,
+  to,
+}: {
+  icon: LucideIcon;
+  eyebrow: string;
+  title: string;
+  description: string;
+  modules: string[];
+  action: string;
+  to: string;
+}) {
+  return (
+    <Card className="flex h-full flex-col border-slate-200/80 shadow-subtle">
+      <CardContent className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-primary">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
+            <p className="text-[11px] text-brand-muted">Workspace preview</p>
+          </div>
+        </div>
+        <h3 className="mt-5 text-lg font-bold leading-snug text-navy-900">{title}</h3>
+        <p className="mt-2 min-h-[3rem] text-sm leading-6 text-brand-muted">{description}</p>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`${eyebrow} workspace modules`}>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Workspace</p>
+          <ul className="space-y-1.5">
+            {modules.map((module) => (
+              <li key={module} className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs font-medium text-navy-800 shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-500" aria-hidden="true" />{module}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Link to={to} className="mt-auto inline-flex min-h-10 items-center justify-between gap-2 pt-5 text-sm font-semibold text-primary transition hover:text-primary-dark">
+          {action}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
 
 function StepCard({ number, icon: Icon, title, description }: { number: string; icon: LucideIcon; title: string; description: string }) {
   return (

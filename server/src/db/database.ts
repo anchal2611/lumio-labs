@@ -1,5 +1,8 @@
 import path from 'path';
 import fs from 'fs';
+import { config } from '../config/env';
+import { hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
+import { readSqliteSnapshot, writeSqliteSnapshot } from '../services/firestoreSqliteStore';
 
 // ─── Setup storage path ───────────────────────────────────────────────────────
 function resolveDataDir(): string {
@@ -18,9 +21,13 @@ const dbPath = path.join(dbDir, 'lumio.db');
 const initSqlJs = require('sql.js');
 
 let sqlDb: any = null; // live in-memory database instance
+let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let remoteSavePromise: Promise<void> | null = null;
+let remoteDirty = false;
+let remoteSaveError: string | null = null;
 
-/** Persist in-memory database to disk */
-function saveDatabase(): void {
+/** Persist the current state in the local working directory. */
+function saveLocalDatabase(): void {
   if (!sqlDb) return;
   try {
     const data: Uint8Array = sqlDb.export();
@@ -30,11 +37,70 @@ function saveDatabase(): void {
   }
 }
 
-// Auto-save every 10 seconds and on process exit
-setInterval(saveDatabase, 10_000).unref();
-process.on('exit', saveDatabase);
-process.on('SIGINT', () => { saveDatabase(); process.exit(0); });
-process.on('SIGTERM', () => { saveDatabase(); process.exit(0); });
+function scheduleRemoteSave(delay = 1_200): void {
+  if (!config.remoteDatabasePersistence || !sqlDb) return;
+  remoteDirty = true;
+  if (remoteSaveTimer) clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveTimer = null;
+    void flushDatabaseSnapshot().catch((error: unknown) => {
+      remoteSaveError = error instanceof Error ? error.message : 'Unknown Firestore snapshot error.';
+      console.error('Firestore database snapshot failed:', remoteSaveError);
+      scheduleRemoteSave(10_000);
+    });
+  }, delay);
+  remoteSaveTimer.unref?.();
+}
+
+export async function flushDatabaseSnapshot(): Promise<void> {
+  if (!config.remoteDatabasePersistence || !sqlDb) return;
+  if (remoteSaveTimer) { clearTimeout(remoteSaveTimer); remoteSaveTimer = null; }
+  if (remoteSavePromise) {
+    await remoteSavePromise;
+    if (remoteDirty) await flushDatabaseSnapshot();
+    return;
+  }
+
+  remoteDirty = false;
+  const snapshot = Buffer.from(sqlDb.export());
+  remoteSavePromise = writeSqliteSnapshot(snapshot);
+  try {
+    await remoteSavePromise;
+    remoteSaveError = null;
+  } catch (error) {
+    remoteDirty = true;
+    throw error;
+  } finally {
+    remoteSavePromise = null;
+  }
+
+  if (remoteDirty) await flushDatabaseSnapshot();
+}
+
+export function getDatabasePersistenceStatus(): { mode: 'firestore' | 'local'; error: string | null } {
+  return { mode: config.remoteDatabasePersistence && hasFirebaseAdminCredentials ? 'firestore' : 'local', error: remoteSaveError };
+}
+
+function saveDatabase(): void {
+  saveLocalDatabase();
+  scheduleRemoteSave();
+}
+
+setInterval(saveLocalDatabase, 10_000).unref();
+process.on('exit', saveLocalDatabase);
+
+let shuttingDown = false;
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (remoteSaveTimer) { clearTimeout(remoteSaveTimer); remoteSaveTimer = null; }
+  saveLocalDatabase();
+  try { await flushDatabaseSnapshot(); }
+  catch (error) { console.error('Final Firestore database snapshot failed:', error); }
+  process.exit(0);
+}
+process.on('SIGINT', () => { void shutdown(); });
+process.on('SIGTERM', () => { void shutdown(); });
 
 // ─── Thin wrapper matching better-sqlite3's synchronous API ──────────────────
 class Statement {
@@ -51,6 +117,7 @@ class Statement {
     sqlDb.run(this.sql, params);
     const rows = sqlDb.exec('SELECT last_insert_rowid() as id, changes() as ch');
     const vals = rows[0]?.values[0] ?? [0, 0];
+    scheduleRemoteSave();
     return { lastInsertRowid: vals[0] as number, changes: vals[1] as number };
   }
 
@@ -76,7 +143,7 @@ class Statement {
 
 class Database {
   prepare(sql: string): Statement { return new Statement(sql); }
-  exec(sql: string): void { sqlDb.run(sql); }
+  exec(sql: string): void { sqlDb.run(sql); scheduleRemoteSave(); }
   pragma(_: string): void { /* no-op for sql.js */ }
   transaction<T extends (...args: any[]) => any>(fn: T): T {
     return ((...args: any[]) => {
@@ -101,7 +168,15 @@ export default db;
 export async function initDatabase(): Promise<void> {
   const SQL = await initSqlJs();
 
-  if (fs.existsSync(dbPath)) {
+  if (config.remoteDatabasePersistence && !hasFirebaseAdminCredentials) {
+    throw new Error('REMOTE_DATABASE_PERSISTENCE is enabled, but Firebase Admin credentials are missing. Set FIREBASE_SERVICE_ACCOUNT_JSON in the server environment.');
+  }
+
+  const remoteSnapshot = config.remoteDatabasePersistence ? await readSqliteSnapshot() : null;
+  if (remoteSnapshot) {
+    sqlDb = new SQL.Database(remoteSnapshot);
+    console.log(`Restored SQLite database from Firestore (${remoteSnapshot.byteLength} bytes).`);
+  } else if (fs.existsSync(dbPath)) {
     const buf = fs.readFileSync(dbPath);
     sqlDb = new SQL.Database(buf);
     console.log('Loaded existing database from: ' + dbPath);
@@ -260,4 +335,5 @@ export async function initDatabase(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_resources_institute_created ON resources(institute_id, created_at);
   `);
+  saveDatabase();
 }

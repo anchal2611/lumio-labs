@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../contexts/ToastContext';
 
 interface Institute { name: string; email_domains: string[]; }
-interface Health { status: string; timestamp: string; version: string; firebaseAdminConfigured: boolean; codeExecutionConfigured: boolean; }
+interface Health { status: string; timestamp: string; version: string; firebaseAdminConfigured: boolean; codeExecutionConfigured: boolean; databasePersistence?: 'firestore' | 'local'; databasePersistenceHealthy?: boolean; }
 
 export const AdminSettings: React.FC = () => {
   const toast = useToast();
@@ -51,7 +51,7 @@ export const AdminSettings: React.FC = () => {
         <div className="flex items-center justify-between gap-4 py-3"><div><p className="font-medium text-navy-900">LUMIO API</p><p className="text-xs text-brand-muted">Version {health.version} · last checked {new Date(health.timestamp).toLocaleString()}</p></div><Badge variant={health.status === 'ok' ? 'success' : 'warning'} size="sm">{health.status === 'ok' ? 'Online' : 'Unavailable'}</Badge></div>
         <div className="flex items-center justify-between gap-4 py-3"><div><p className="font-medium text-navy-900">Firebase Admin SDK</p><p className="text-xs text-brand-muted">Required for server-side Firebase sign-in verification and faculty account provisioning.</p></div>{serviceStatus(health.firebaseAdminConfigured)}</div>
         <div className="flex items-center justify-between gap-4 py-3"><div><p className="font-medium text-navy-900">Code execution provider</p><p className="text-xs text-brand-muted">Production code execution requires a configured Judge0 API key.</p></div>{serviceStatus(health.codeExecutionConfigured)}</div>
-        <div className="flex items-center gap-3 py-3"><Database className="h-4 w-4 shrink-0 text-amber-600" /><p className="text-xs text-brand-muted">Application records still use local SQLite. Render Free storage is ephemeral, so records can reset when the service restarts or redeploys.</p></div>
+        <div className="flex items-start justify-between gap-4 py-3"><div className="flex items-start gap-3"><Database className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /><div><p className="font-medium text-navy-900">Application data persistence</p><p className="mt-0.5 text-xs text-brand-muted">{health.databasePersistence === 'firestore' ? 'SQLite snapshots are saved to Firebase Firestore so institute data can be restored after a redeploy.' : 'This deployment is using local storage only. Its database may reset when the service restarts or redeploys.'}</p></div></div><Badge variant={health.databasePersistence === 'firestore' && health.databasePersistenceHealthy !== false ? 'success' : 'warning'} size="sm">{health.databasePersistence === 'firestore' ? (health.databasePersistenceHealthy === false ? 'Sync issue' : 'Firestore') : 'Local only'}</Badge></div>
       </div> : <div className="flex items-center gap-2 py-4 text-sm text-amber-700"><CircleHelp className="h-4 w-4" />Service status could not be read.</div>}
     </CardContent></Card>
     <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>Secret keys are configured in Render environment variables, not from this page. Never paste a Firebase service-account key into the browser.</p></div>

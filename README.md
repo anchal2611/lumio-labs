@@ -208,7 +208,11 @@ LUMIO is configured to be deployed as a single full-stack unified service or as 
 
 The client reads Firebase web configuration from `client/.env` locally and `VITE_FIREBASE_*` variables on Render. Enable **Email/Password** under Firebase Authentication > Sign-in method, then deploy the checked-in rules from the repository root with `firebase use lumio-e3c95` and `firebase deploy --only firestore:rules,storage`. Do not put a service-account key in the client or commit it; Render's `FIREBASE_SERVICE_ACCOUNT_JSON` is reserved for backend Admin SDK operations.
 
-Firebase Auth is wired for new student and teacher signups and login. The app still uses its existing SQLite database as the source for classes, labs, assignments, and collaboration; those collections have not yet been migrated to Firestore, and existing accounts need an explicit Auth import before Firebase login can replace their current credentials. Render Free uses ephemeral local storage: SQLite data can reset after restarts, deploys, or spin-downs. Don't store production records there until the app data has been migrated to Firestore or another persistent database.
+Firebase Auth handles sign-in, while LUMIO's application records remain in SQLite. The Render Free blueprint keeps a rolling SQLite snapshot in Firestore (`REMOTE_DATABASE_PERSISTENCE=true`) and restores it on startup, so institute, account, class, lab, assignment, and collaboration data survive service redeploys. Configure `FIREBASE_SERVICE_ACCOUNT_JSON` in Render for the server-side Firestore access; the service will refuse to start in remote-persistence mode when this credential is missing. Local development continues to use the local SQLite file unless the remote-persistence flag is explicitly enabled.
+
+Firestore's free quota currently includes 1 GiB of storage and 20,000 document writes per day. The snapshot is chunked so it can exceed Firestore's per-document size limit, but this prototype snapshot approach is intended for the current small deployment and should be replaced with a queryable database before the app grows substantially. Check the [Firestore free quota](https://firebase.google.com/docs/firestore/pricing) and [document size limits](https://firebase.google.com/docs/firestore/quotas) for current limits.
+
+The first remote snapshot can only preserve data that exists when the updated server starts. If a prior Render deployment has already discarded its ephemeral SQLite file, Firebase Auth alone does not contain the missing institute roles and coursework records. The login screen now reports this specific mismatch instead of silently treating it as a bad password; older profiles can only be restored from a database backup or recreated once.
 
 ### Option 1: 1-Click Render Deployment (Recommended - Free Tier with WebSockets)
 
@@ -220,7 +224,7 @@ Render supports WebSockets and will host both the frontend and backend from a si
 4. Render will read `render.yaml` automatically and configure:
    - **Build Command**: `npm run render-build` (installs from lockfiles and builds both apps)
    - **Start Command**: `node server/dist/index.js`
-   - A persistent `/data` disk for the SQLite database
+   - Firestore-backed SQLite snapshots for data recovery across free-instance redeploys (set `FIREBASE_SERVICE_ACCOUNT_JSON` in the Render dashboard)
 5. Click **Apply**. Within 2-3 minutes, your live URL will be active!
 
 Production requirements:

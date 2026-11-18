@@ -8,8 +8,9 @@ import fs from 'fs';
 import { config } from './config/env';
 import { apiRouter } from './routes/api';
 import { setupCollabSockets } from './sockets/collabSocket';
-import { initDatabase } from './db/database';
+import { flushDatabaseSnapshot, initDatabase } from './db/database';
 import { seedDatabase } from './db/seed';
+import { ensureStarterLabsForAllInstitutes } from './services/starterLabs';
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +78,8 @@ async function start() {
     } else {
       console.log('Demo seed data is disabled in production.');
     }
+    ensureStarterLabsForAllInstitutes();
+    await flushDatabaseSnapshot();
   } catch (err) {
     console.error('Database init failed:', err);
     process.exit(1);

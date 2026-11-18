@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import db from '../db/database';
 import { AuthRequest } from '../middleware/auth';
 import { recordAudit } from './activityController';
+import { ensureInstituteStarterLabs } from '../services/starterLabs';
 
 // POST /api/institutes/register — creates institute + admin account
 export async function registerInstitute(req: AuthRequest, res: Response): Promise<void> {
@@ -52,6 +53,7 @@ export async function registerInstitute(req: AuthRequest, res: Response): Promis
       `).run(adminId, adminName.trim(), adminEmail.toLowerCase(), passwordHash, instituteId);
 
       db.prepare('UPDATE institutes SET admin_user_id = ? WHERE id = ?').run(adminId, instituteId);
+      ensureInstituteStarterLabs(instituteId, adminId);
       db.prepare(`INSERT INTO audit_logs (id, institute_id, actor_id, actor_email, action, entity_type, entity_id, details, ip_address)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(uuid(), instituteId, adminId, adminEmail.toLowerCase(), 'institute.created', 'institute', instituteId, `Created institute "${instituteName.trim()}".`, req.ip || null);
     })();
@@ -85,8 +87,8 @@ export function getMyInstitute(req: AuthRequest, res: Response): void {
     totalClasses: (db.prepare('SELECT COUNT(*) as c FROM classes WHERE institute_id = ?').get(req.user.instituteId) as any)?.c || 0,
     totalLabs: (db.prepare(`
       SELECT COUNT(*) as c FROM lab_modules lm
-      JOIN classes c ON c.id = lm.class_id
-      WHERE c.institute_id = ?
+      JOIN users owner ON owner.id = lm.teacher_id
+      WHERE owner.institute_id = ?
     `).get(req.user.instituteId) as any)?.c || 0,
   };
 
