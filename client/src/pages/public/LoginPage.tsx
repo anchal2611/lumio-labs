@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { LogIn, Eye, EyeOff, Loader2, FlaskConical, GraduationCap, BookOpen, Shield, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,6 +15,7 @@ const DEMO_CREDS = [
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, setValue, formState: { isSubmitting } } = useForm<LoginFormData>();
@@ -25,7 +26,11 @@ export const LoginPage: React.FC = () => {
       await login(data);
       const user = JSON.parse(localStorage.getItem('lumio_auth_user') || '{}');
       const role = user?.role || 'student';
-      navigate(role === 'admin' ? '/admin/dashboard' : role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true });
+      const from = (location.state as any)?.from;
+      const destination = typeof from?.pathname === 'string' && from.pathname.startsWith('/') && !from.pathname.startsWith('//')
+        ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+        : null;
+      navigate(destination || (role === 'admin' ? '/admin/dashboard' : role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard'), { replace: true });
     } catch (e: any) {
       setError(e.message || 'Login failed. Please check your credentials.');
     }
@@ -128,7 +133,7 @@ export const LoginPage: React.FC = () => {
 
         {/* Footer links */}
         <div className="mt-6 flex flex-col items-center gap-3 text-sm text-slate-500">
-          <span>Don't have an account? <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium">Register</Link></span>
+          <span>Don't have an account? <Link to="/register" state={location.state} className="text-blue-400 hover:text-blue-300 font-medium">Register</Link></span>
           <Link to="/institute/register" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors">
             <Building2 className="w-4 h-4" />
             Register Your Institute

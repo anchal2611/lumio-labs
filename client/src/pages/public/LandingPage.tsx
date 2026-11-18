@@ -1,332 +1,376 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
-  FlaskConical,
-  Code2,
-  Database,
-  Cpu,
-  Users,
-  ShieldCheck,
-  CheckCircle2,
   ArrowRight,
-  Sparkles,
-  Layers,
-  GraduationCap,
-  BookOpen,
-  Terminal,
-  Zap,
+  Binary,
+  BookOpenCheck,
+  Braces,
+  Building2,
+  Check,
+  Code2,
+  Cpu,
+  Database,
+  FlaskConical,
   Globe,
+  Layers3,
+  Network,
+  UsersRound,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardContent } from '../../components/ui/Card';
-import { MOCK_LABS } from '../../services/mockData';
 import { useAuth } from '../../contexts/AuthContext';
+import { config } from '../../config/env';
+import { MOCK_LABS } from '../../services/mockData';
+import { LabItem } from '../../types/lab';
 import { UserRole } from '../../types/auth';
 
-export const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated, role } = useAuth();
+const dashboardPaths: Record<UserRole, string> = {
+  student: '/student/dashboard',
+  teacher: '/teacher/dashboard',
+  admin: '/admin/dashboard',
+};
 
-  const handleLaunchDemo = (demoRole: UserRole) => {
-    // Navigate to login; demo auto-fill cards are there
-    navigate('/login');
-  };
+const labBrowsePaths: Record<UserRole, string> = {
+  student: '/student/labs',
+  teacher: '/teacher/labs',
+  admin: '/admin/labs',
+};
 
+const labIcons: Record<string, LucideIcon> = {
+  Code2,
+  Cpu,
+  Database,
+  Zap,
+  Globe,
+  Binary,
+  Network,
+};
+
+const categoryLabels: Record<LabItem['category'], string> = {
+  programming: 'Programming',
+  database: 'Database',
+  web: 'Web development',
+  iot: 'IoT & circuits',
+  ai: 'Artificial intelligence',
+  core_cs: 'Computer science',
+};
+
+const primaryLinkClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2';
+const secondaryLinkClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2';
+
+function getLabIcon(lab: LabItem): LucideIcon {
+  return labIcons[lab.iconName] || FlaskConical;
+}
+
+function LabCard({ lab }: { lab: LabItem }) {
+  const Icon = getLabIcon(lab);
 
   return (
-    <div className="min-h-screen bg-brand-canvas text-brand-text flex flex-col selection:bg-brand-lightAqua selection:text-navy-900">
-      {/* Navigation Bar */}
-      <header className="h-18 bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 px-4 sm:px-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src="/lumio-logo.svg" alt="LUMIO" className="w-9 h-9 rounded-xl shadow-xs" />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl text-navy-900 tracking-tight">LUMIO</span>
-              <Badge variant="aqua" size="sm">
-                Virtual Labs
-              </Badge>
-            </div>
+    <Card className="h-full border-slate-200/80 shadow-subtle">
+      <CardContent className="flex h-full flex-col p-5 sm:p-6">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-primary">
+            <Icon className="h-5 w-5" aria-hidden="true" />
           </div>
+          <Badge variant="neutral" size="sm" className="capitalize">
+            {lab.difficulty}
+          </Badge>
         </div>
 
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-brand-muted">
-          <a href="#labs" className="hover:text-primary transition-colors">
-            Explore Labs
-          </a>
-          <a href="#collaboration" className="hover:text-primary transition-colors">
-            Collaboration
-          </a>
-          <a href="#ecosystem" className="hover:text-primary transition-colors">
-            Ecosystem
-          </a>
-          <a href="#how-it-works" className="hover:text-primary transition-colors">
-            How It Works
-          </a>
-        </nav>
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">
+          {categoryLabels[lab.category] || lab.category.replace(/_/g, ' ')}
+        </p>
+        <h3 className="mt-1.5 text-base font-bold leading-snug text-navy-900">{lab.name}</h3>
+        <p className="mt-2 flex-1 text-sm leading-relaxed text-brand-muted">{lab.tagline}</p>
 
-        <div className="flex items-center gap-3">
-          <Link
-            to="/login"
-            className="px-4 py-2 text-xs font-semibold text-navy-900 hover:text-primary transition-colors"
-          >
-            Sign In
+        <div className="mt-5 flex flex-wrap gap-1.5" aria-label="Supported languages">
+          {lab.languages.map((language) => (
+            <Badge key={language} variant="info" size="sm" className="uppercase">
+              {language}
+            </Badge>
+          ))}
+        </div>
+
+        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-brand-muted">
+          <span>{lab.experimentCount} practicals</span>
+          <span>{lab.estimatedHours} guided hours</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export const LandingPage: React.FC = () => {
+  const { isAuthenticated, role } = useAuth();
+  const allLabs = MOCK_LABS;
+  const featuredLab = allLabs.find((lab) => lab.isPopular) || allLabs[0];
+  const FeaturedIcon = featuredLab ? getLabIcon(featuredLab) : FlaskConical;
+  const browsePath = isAuthenticated ? labBrowsePaths[role] : '/student/labs';
+
+  return (
+    <div className="min-h-screen bg-brand-canvas text-brand-text selection:bg-brand-lightAqua selection:text-navy-900">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:shadow-floating">
+        Skip to content
+      </a>
+
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link to="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${config.appName} home`}>
+            <img src="/lumio-logo.svg" alt="" className="h-9 w-9 rounded-xl" />
+            <span className="text-lg font-extrabold tracking-tight text-navy-900">{config.appName}</span>
           </Link>
-          <Link
-            to="/register"
-            className="px-4 py-2 text-xs font-semibold bg-primary hover:bg-primary-dark text-white rounded-lg shadow-sm transition-all hover:shadow-primary/20"
-          >
-            Get Started
-          </Link>
+
+          <nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm font-medium text-brand-muted md:flex">
+            <a href="#labs" className="transition hover:text-primary">Labs</a>
+            <a href="#collaboration" className="transition hover:text-primary">Collaboration</a>
+            <a href="#how-it-works" className="transition hover:text-primary">How it works</a>
+          </nav>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {isAuthenticated ? (
+              <>
+                <Link to={dashboardPaths[role]} className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-navy-900 transition hover:bg-slate-50 sm:inline-flex">
+                  Dashboard
+                </Link>
+                <Link to={browsePath} className={primaryLinkClass}>
+                  Browse labs <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-navy-900 transition hover:bg-slate-50">
+                  Sign in
+                </Link>
+                <Link to="/register" className={`${primaryLinkClass} px-4 sm:px-5`}>
+                  <span className="hidden sm:inline">Create account</span>
+                  <span className="sm:hidden">Join</span>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative pt-16 pb-20 px-4 sm:px-8 overflow-hidden bg-gradient-to-b from-white via-brand-canvas to-brand-canvas">
-        {/* Subtle decorative circles */}
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-tr from-brand-lightAqua/40 via-sky-100/30 to-blue-100/20 blur-3xl rounded-full pointer-events-none" />
-
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200/80 text-primary text-xs font-semibold mb-6 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span>Virtual Labs. Limitless Learning.</span>
+      <main id="main-content">
+        <section className="relative isolate overflow-hidden bg-white">
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+            <div className="absolute -right-40 -top-56 h-[34rem] w-[34rem] rounded-full bg-sky-100/80 blur-3xl" />
+            <div className="absolute -bottom-72 left-1/4 h-[28rem] w-[38rem] rounded-full bg-cyan-50 blur-3xl" />
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-navy-900 tracking-tight leading-[1.12]">
-            Your University Lab. <br />
-            <span className="bg-gradient-to-r from-primary via-sky-600 to-teal-600 bg-clip-text text-transparent">
-              Reimagined.
-            </span>
-          </h1>
-
-          <p className="mt-5 text-base sm:text-lg text-brand-muted max-w-2xl mx-auto leading-relaxed font-normal">
-            Learn by doing. Build by experimenting. Collaborate without boundaries. Experience your university laboratories in one connected digital workspace.
-          </p>
-
-          {/* Call to action buttons */}
-          <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
-            <a
-              href="#labs"
-              className="px-6 py-3 text-sm font-semibold bg-primary hover:bg-primary-dark text-white rounded-xl shadow-md transition-all hover:scale-[1.02] flex items-center gap-2"
-            >
-              <FlaskConical className="w-4 h-4" />
-              <span>Explore Laboratories</span>
-            </a>
-            <Link
-              to="/register"
-              className="px-6 py-3 text-sm font-semibold bg-white hover:bg-slate-50 text-navy-900 border border-slate-300 rounded-xl shadow-xs transition-all hover:scale-[1.02] flex items-center gap-2"
-            >
-              <span>Student & Faculty Access</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {/* Quick Demo Launchers */}
-          <div className="mt-10 p-4 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-elevated max-w-xl mx-auto">
-            <p className="text-xs font-semibold text-navy-900 uppercase tracking-wider mb-2.5">
-              Instant University Tour (1-Click Demo)
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => handleLaunchDemo('student')}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-primary text-xs font-semibold border border-blue-200 transition-all"
-              >
-                <GraduationCap className="w-4 h-4" />
-                <span>Demo Student</span>
-              </button>
-              <button
-                onClick={() => handleLaunchDemo('teacher')}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-semibold border border-teal-200 transition-all"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Demo Teacher</span>
-              </button>
-              <button
-                onClick={() => handleLaunchDemo('admin')}
-                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold border border-amber-200 transition-all"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Demo Admin</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Hero Interactive Terminal / IDE Mockup */}
-        <div className="max-w-5xl mx-auto mt-14 rounded-2xl border border-slate-700/80 shadow-2xl bg-navy-950 overflow-hidden text-left font-mono text-xs text-slate-300">
-          <div className="flex items-center justify-between px-4 py-3 bg-navy-900 border-b border-navy-800">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              <span className="ml-2 text-slate-400 font-sans text-xs">lumio-virtual-ide — binary_search.py</span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-brand-aqua font-sans">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sandbox Engine Connected</span>
-            </div>
-          </div>
-
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy-950">
-            <div>
-              <div className="text-slate-500 mb-2">// Guided Practical #1 — Algorithm Verification</div>
-              <pre className="text-slate-200 leading-relaxed font-mono">
-{`def binary_search(arr, target):
-    left, right = 0, len(arr) - 1
-    while left <= right:
-        mid = (left + right) // 2
-        if arr[mid] == target:
-            return mid
-        elif arr[mid] < target:
-            left = mid + 1
-        else:
-            right = mid - 1
-    return -1
-
-# Executed in sandboxed virtual container`}
-              </pre>
-            </div>
-
-            <div className="border-t md:border-t-0 md:border-l border-navy-800 md:pl-6 pt-4 md:pt-0">
-              <div className="text-emerald-400 font-semibold mb-2 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Compiler Stdout (Execution 24ms | 4.1MB RAM)</span>
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-8 lg:py-24">
+            <div className="max-w-2xl">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-primary">
+                <Layers3 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{config.tagline}</span>
               </div>
-              <div className="p-3 bg-navy-900/90 rounded-lg border border-navy-800 text-[11px] text-emerald-300 space-y-1">
-                <div>=== LUMIO VIRTUAL LAB: SEARCH ALGORITHMS ===</div>
-                <div>Dataset: [12, 24, 35, 47, 59, 68, 77, 88, 99]</div>
-                <div>Searching for target: 68</div>
-                <div>[Result] Binary Search Found at Index: 5</div>
-                <div className="text-brand-aqua">[Status] Verification Passed: O(log n) satisfied.</div>
+
+              <h1 className="text-4xl font-extrabold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-[3.6rem]">
+                Practical learning,
+                <span className="mt-1 block text-primary">all in one place.</span>
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-brand-muted sm:text-lg sm:leading-8">
+                Run experiments, work through guided practicals, and learn with your class in a shared digital lab space.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to={browsePath} className={primaryLinkClass}>
+                  {isAuthenticated ? 'Browse your labs' : 'Explore the labs'}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                {isAuthenticated ? (
+                  <Link to={dashboardPaths[role]} className={secondaryLinkClass}>Go to dashboard</Link>
+                ) : (
+                  <Link to="/register" className={secondaryLinkClass}>
+                    Student sign up
+                  </Link>
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Laboratory Categories Section */}
-      <section id="labs" className="py-20 px-4 sm:px-8 max-w-7xl mx-auto w-full">
-        <div className="text-center max-w-3xl mx-auto mb-14">
-          <Badge variant="aqua" size="sm" className="mb-2">
-            Diverse Practical Disciplines
-          </Badge>
-          <h2 className="text-3xl font-extrabold text-navy-900 tracking-tight">
-            Comprehensive Digital Laboratories
-          </h2>
-          <p className="text-sm text-brand-muted mt-2">
-            Every laboratory supports both Guided Practicals with Viva questions and Open Workspace for free experimentation.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {MOCK_LABS.map((lab) => (
-            <Card key={lab.id} hoverable className="border border-slate-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-primary font-bold">
-                    {lab.languages[0]?.toUpperCase() || 'LAB'}
-                  </div>
-                  <Badge variant="primary" size="sm" className="capitalize">
-                    {lab.category}
-                  </Badge>
-                </div>
-                <h3 className="text-base font-bold text-navy-900">{lab.name}</h3>
-                <p className="text-xs text-brand-muted mt-1 leading-relaxed">
-                  {lab.description}
+              {!isAuthenticated && (
+                <p className="mt-4 text-sm text-brand-muted">
+                  Setting up a campus?{' '}
+                  <Link to="/institute/register" className="font-semibold text-primary underline decoration-blue-200 underline-offset-4 hover:text-primary-dark">
+                    Register your institution
+                  </Link>
                 </p>
+              )}
 
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500 font-medium justify-between">
-                  <span>{lab.experimentCount} Practicals</span>
-                  <button
-                    onClick={() => handleLaunchDemo('student')}
-                    className="text-primary font-semibold flex items-center gap-1 hover:underline"
-                  >
-                    Open Lab <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+              <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200/80 pt-6 text-sm font-medium text-navy-800">
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Guided practicals</span>
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Open workspaces</span>
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Class collaboration</span>
+              </div>
+            </div>
+
+            {featuredLab && (
+              <div className="relative mx-auto w-full max-w-xl lg:ml-auto">
+                <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-blue-100 via-cyan-50 to-teal-100 blur-xl" aria-hidden="true" />
+                <Card className="overflow-hidden rounded-2xl border-slate-200/90 shadow-floating">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-5 py-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
+                        <FeaturedIcon className="h-4 w-4" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-navy-900">Lab workspace</p>
+                        <p className="text-[11px] text-brand-muted">A sample environment</p>
+                      </div>
+                    </div>
+                    <Badge variant="neutral" size="sm">Sample lab</Badge>
+                  </div>
+
+                  <CardContent className="p-5 sm:p-7">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Featured lab</p>
+                    <h2 className="mt-2 text-xl font-bold tracking-tight text-navy-900 sm:text-2xl">{featuredLab.name}</h2>
+                    <p className="mt-2 text-sm leading-6 text-brand-muted">{featuredLab.description}</p>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">Practice modes</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {featuredLab.supportedModes.map((mode) => (
+                            <Badge key={mode} variant="primary" size="sm" className="capitalize">{mode}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">Tools</p>
+                        <p className="mt-2 text-sm font-semibold text-navy-900">{featuredLab.tools.length} built in</p>
+                        <p className="mt-0.5 truncate text-xs text-brand-muted">{featuredLab.tools.slice(0, 2).join(' · ')}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                      <div className="flex items-center gap-4 text-xs text-brand-muted">
+                        <span className="inline-flex items-center gap-1.5"><BookOpenCheck className="h-4 w-4 text-teal-600" aria-hidden="true" />{featuredLab.experimentCount} practicals</span>
+                        <span className="inline-flex items-center gap-1.5"><Braces className="h-4 w-4 text-teal-600" aria-hidden="true" />{featuredLab.languages.join(' / ').toUpperCase()}</span>
+                      </div>
+                      <a href="#labs" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark">
+                        See all labs <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-brand-muted">
+                  <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" />
+                  Lab details are drawn from the platform catalog
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Collaboration Triad Section */}
-      <section id="collaboration" className="py-20 px-4 sm:px-8 bg-white border-y border-slate-200/80">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto mb-14">
-            <Badge variant="primary" size="sm" className="mb-2">
-              Three-Way Digital Collaboration
-            </Badge>
-            <h2 className="text-3xl font-extrabold text-navy-900 tracking-tight">
-              A Connected University Community
-            </h2>
-            <p className="text-sm text-brand-muted mt-2">
-              Collaboration is not an afterthought in LUMIO. It powers code co-editing, faculty practical authoring, and student doubt resolution.
-            </p>
+              </div>
+            )}
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-primary flex items-center justify-center font-bold">
-                <Users className="w-5 h-5" />
+        <section id="labs" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div className="max-w-2xl">
+                <Badge variant="aqua" size="sm">Lab environments</Badge>
+                <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">A workspace for every kind of practical</h2>
+                <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">
+                  Browse the environments supported by LUMIO, from programming and databases to circuits and systems.
+                </p>
               </div>
-              <h3 className="text-base font-bold text-navy-900">Student-to-Student</h3>
-              <p className="text-xs text-brand-muted leading-relaxed">
-                Real-time pair programming rooms, multi-cursor code editors, study groups, peer review feedback, and live group chat.
-              </p>
+              <Link to={browsePath} className="inline-flex items-center gap-2 self-start text-sm font-semibold text-primary hover:text-primary-dark sm:self-auto">
+                {isAuthenticated ? 'Open your labs' : 'Continue to lab access'}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
 
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-navy-900">Teacher-to-Teacher</h3>
-              <p className="text-xs text-brand-muted leading-relaxed">
-                Collaborative authoring of lab manuals, shared assignment templates, department resource pools, and faculty discussion rooms.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-navy-900">Student-to-Teacher</h3>
-              <p className="text-xs text-brand-muted leading-relaxed">
-                &quot;Ask a Teacher&quot; doubt forums, code line annotations, assignment submission feedback, and doubt resolution history.
-              </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {allLabs.map((lab) => <LabCard key={lab.id} lab={lab} />)}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* University Footer */}
-      <footer className="mt-auto bg-navy-950 text-slate-400 py-12 px-4 sm:px-8 text-xs border-t border-navy-900">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <img src="/lumio-logo.svg" alt="LUMIO" className="w-7 h-7 rounded-lg" />
+        <section id="how-it-works" className="scroll-mt-20 border-y border-slate-200/80 bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto mb-10 max-w-2xl text-center">
+              <Badge variant="primary" size="sm">Getting started</Badge>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">From class to practical work</h2>
+              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">Coursework, lab time, and collaboration stay connected in one place.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <StepCard number="01" icon={Building2} title="Join your institute" description="Students create an account with their campus email. Faculty and institute admins manage access through their institution." />
+              <StepCard number="02" icon={FlaskConical} title="Open a class lab" description="Choose a published practical, follow its guide, or use the workspace to explore a problem on your own." />
+              <StepCard number="03" icon={UsersRound} title="Work and share" description="Collaborate in real time, submit coursework, and keep feedback connected to the practical." />
+            </div>
+          </div>
+        </section>
+
+        <section id="collaboration" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto grid max-w-7xl items-center gap-10 rounded-2xl bg-navy-950 px-6 py-8 text-white sm:px-10 sm:py-10 lg:grid-cols-[1fr_auto] lg:gap-14">
             <div>
-              <span className="text-white font-bold text-sm tracking-tight">LUMIO</span>
-              <p className="text-[11px] text-slate-500">Virtual Labs. Limitless Learning.</p>
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-cyan-200">
+                <UsersRound className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Built for learning together</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Your lab work has a team around it.</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Pair on code, ask faculty for help, and keep practical work connected to your classes.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-200">
+                <span className="inline-flex items-center gap-2"><UsersRound className="h-4 w-4 text-cyan-200" aria-hidden="true" />Peer rooms</span>
+                <span className="inline-flex items-center gap-2"><BookOpenCheck className="h-4 w-4 text-cyan-200" aria-hidden="true" />Faculty guidance</span>
+                <span className="inline-flex items-center gap-2"><Code2 className="h-4 w-4 text-cyan-200" aria-hidden="true" />Shared workspaces</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-start gap-3 lg:items-end">
+              {isAuthenticated ? (
+                <Link to={role === 'admin' ? dashboardPaths.admin : `${role === 'teacher' ? '/teacher' : '/student'}/collaboration`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
+                  {role === 'admin' ? 'Go to dashboard' : 'Open collaboration'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                <Link to="/student/collaboration" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-navy-950">
+                  Sign in to collaborate <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              )}
+              {!isAuthenticated && <Link to="/register" className="text-sm font-medium text-slate-300 underline decoration-slate-500 underline-offset-4 hover:text-white">Create a student account</Link>}
             </div>
           </div>
+        </section>
+      </main>
 
-          <div className="flex items-center gap-6">
-            <Link to="/login" className="hover:text-white transition-colors">
-              Sign In
-            </Link>
-            <Link to="/register" className="hover:text-white transition-colors">
-              Register Institution
-            </Link>
-            <a href="#labs" className="hover:text-white transition-colors">
-              Laboratories
-            </a>
-          </div>
+      <footer className="border-t border-slate-200 bg-white px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/" className="flex items-center gap-2.5" aria-label={`${config.appName} home`}>
+            <img src="/lumio-logo.svg" alt="" className="h-8 w-8 rounded-lg" />
+            <div>
+              <span className="text-sm font-bold text-navy-900">{config.appName}</span>
+              <p className="text-xs text-brand-muted">{config.tagline}</p>
+            </div>
+          </Link>
 
-          <p className="text-slate-500 text-[11px]">
-            &copy; 2026 LUMIO Platform. Built for University Computer Science & Engineering.
-          </p>
+          <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-brand-muted">
+            <Link to="/login" className="hover:text-primary">Sign in</Link>
+            <Link to="/register" className="hover:text-primary">Student account</Link>
+            <Link to="/institute/register" className="hover:text-primary">Register an institution</Link>
+            <a href="#labs" className="hover:text-primary">Labs</a>
+          </nav>
+
+          <p className="text-xs text-brand-muted">© {new Date().getFullYear()} {config.appName}</p>
         </div>
       </footer>
     </div>
   );
 };
+
+function StepCard({ number, icon: Icon, title, description }: { number: string; icon: LucideIcon; title: string; description: string }) {
+  return (
+    <Card className="h-full border-slate-200/80">
+      <CardContent className="p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-primary">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <span className="text-sm font-bold tabular-nums text-slate-300">{number}</span>
+        </div>
+        <h3 className="mt-5 text-base font-bold text-navy-900">{title}</h3>
+        <p className="mt-2 text-sm leading-6 text-brand-muted">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}

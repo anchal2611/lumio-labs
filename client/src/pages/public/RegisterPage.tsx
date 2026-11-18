@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { UserPlus, Loader2, FlaskConical, CheckCircle2, Building2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +20,7 @@ interface RegisterForm {
 export const RegisterPage: React.FC = () => {
   const { register: authRegister } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [domainCheck, setDomainCheck] = useState<{ matched: boolean; institute?: { name: string } } | null>(null);
@@ -66,7 +67,11 @@ export const RegisterPage: React.FC = () => {
       });
       const user = JSON.parse(localStorage.getItem('lumio_auth_user') || '{}');
       const role = user?.role || 'student';
-      navigate(role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard', { replace: true });
+      const from = (location.state as any)?.from;
+      const destination = typeof from?.pathname === 'string' && from.pathname.startsWith('/') && !from.pathname.startsWith('//')
+        ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+        : null;
+      navigate(destination || (role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard'), { replace: true });
     } catch (e: any) {
       setError(e.message || 'Registration failed.');
     }
