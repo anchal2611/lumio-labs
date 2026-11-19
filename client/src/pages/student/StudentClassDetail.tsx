@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Users, FlaskConical, BookOpen, ClipboardList, Copy, Check, Loader2, ChevronRight, Play } from 'lucide-react';
+import { ArrowLeft, Users, FlaskConical, BookOpen, ClipboardList, Copy, Check, Loader2, ChevronRight, Play, MessageSquare } from 'lucide-react';
 import { apiGet } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ClassDetail {
   id: string; name: string; subject: string; description?: string;
@@ -11,6 +12,7 @@ interface ClassDetail {
 
 export const StudentClassDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [cls, setCls] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'labs' | 'assignments' | 'members'>('labs');
@@ -121,10 +123,11 @@ export const StudentClassDetail: React.FC = () => {
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">
                 {s.name?.[0]}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-white font-medium">{s.name}</p>
                 <p className="text-slate-500 text-xs">{s.roll_number} {s.branch ? `• ${s.branch}` : ''}</p>
               </div>
+              {s.id !== user?.id && <Link to={`/student/messages?to=${encodeURIComponent(s.id)}`} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-blue-500 hover:text-white"><MessageSquare className="h-3.5 w-3.5" />Message</Link>}
             </div>
           ))}
         </div>

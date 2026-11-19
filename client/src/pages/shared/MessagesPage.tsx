@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2, MessageSquare, Search, Send } from 'lucide-react';
 import { apiGet, apiPost } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +12,8 @@ type Message = { id: string; sender_id: string; sender_name: string; body: strin
 
 export const MessagesPage: React.FC = () => {
   const { user, role } = useAuth();
+  const [searchParams] = useSearchParams();
+  const requestedRecipientRef = useRef(searchParams.get('to') || '');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -20,6 +23,7 @@ export const MessagesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [lookingUpEmail, setLookingUpEmail] = useState(false);
   const [error, setError] = useState('');
 
   const loadInbox = useCallback(async () => {
@@ -28,9 +32,20 @@ export const MessagesPage: React.FC = () => {
         apiGet<{ contacts: Contact[] }>('/messages/contacts'),
         apiGet<{ conversations: Conversation[] }>('/messages/conversations'),
       ]);
-      setContacts(contactData.contacts || []);
-      setConversations(conversationData.conversations || []);
-      setActiveId((current) => current || conversationData.conversations?.[0]?.other_user_id || '');
+      const nextContacts = contactData.contacts || [];
+      const nextConversations = conversationData.conversations || [];
+      setContacts(nextContacts);
+      setConversations(nextConversations);
+      setActiveId((current) => {
+        const requestedId = requestedRecipientRef.current;
+        if (requestedId) {
+          requestedRecipientRef.current = '';
+          const canMessage = nextContacts.some((contact) => contact.id === requestedId)
+            || nextConversations.some((conversation) => conversation.other_user_id === requestedId);
+          if (canMessage) return requestedId;
+        }
+        return current || nextConversations[0]?.other_user_id || '';
+      });
       setError('');
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not load messages.'); }
     finally { setLoading(false); }
@@ -85,13 +100,34 @@ export const MessagesPage: React.FC = () => {
     finally { setSending(false); }
   };
 
+  const startByEmail = async () => {
+    const email = search.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || lookingUpEmail) return;
+    setLookingUpEmail(true);
+    setError('');
+    try {
+      const data = await apiGet<{ contacts: Contact[] }>(`/messages/contacts?email=${encodeURIComponent(email)}`);
+      const contact = data.contacts?.[0];
+      if (!contact) {
+        setError('No messageable account matched that email. You can message people in your institute or classes.');
+        return;
+      }
+      setContacts((current) => [contact, ...current.filter((item) => item.id !== contact.id)]);
+      setActiveId(contact.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not find an account for that email.');
+    } finally {
+      setLookingUpEmail(false);
+    }
+  };
+
   const title = role === 'admin' ? 'Institute messages' : role === 'teacher' ? 'Messages' : 'Messages';
   return <div className="space-y-5">
     <header><div className="mb-1 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-teal-600" /><h1 className="text-xl font-bold text-navy-900 sm:text-2xl">{title}</h1></div><p className="text-sm text-brand-muted">Message people connected to your institute or classes. New messages and replies appear here across roles.</p></header>
     {error && <div role="alert" className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
     <Card className="flex h-[min(720px,calc(100vh-220px))] min-h-[440px] overflow-hidden">
       <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 sm:w-72">
-        <div className="border-b border-slate-200 bg-white p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-900">People & conversations</p><div className="relative"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search people" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-primary" /></div></div>
+        <div className="border-b border-slate-200 bg-white p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-navy-900">People & conversations</p><div className="relative"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void startByEmail(); }} placeholder="Search name or email" className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-primary" /></div>{/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(search.trim()) && <Button className="mt-2 w-full" size="sm" variant="outline" disabled={lookingUpEmail} onClick={() => void startByEmail()}>{lookingUpEmail ? 'Looking up email…' : 'Start message to this email'}</Button>}</div>
         <div className="flex-1 space-y-1 overflow-y-auto p-2">
           {loading ? <div className="p-5 text-center text-xs text-brand-muted"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" />Loading…</div>
             : visibleContacts.length === 0 ? <p className="p-4 text-xs leading-relaxed text-brand-muted">No contacts are available yet. Join or create a class to connect with its people.</p>

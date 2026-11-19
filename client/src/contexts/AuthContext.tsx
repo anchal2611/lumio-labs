@@ -41,7 +41,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await apiGet<UserProfile>('/auth/me');
           setUser(profile);
           localStorage.setItem(USER_KEY, JSON.stringify(profile));
-        } catch { setUser(null); }
+        } catch (profileErr) {
+          setUser(null);
+          if (profileErr instanceof Error && /account profile not found|user not found/i.test(profileErr.message)) {
+            clearTokens();
+            await signOut(firebaseAuth).catch(() => {});
+          }
+        }
         finally { setIsLoading(false); }
       });
     }
@@ -78,7 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             profile = await apiGet<UserProfile>('/auth/me');
           } catch (profileErr: any) {
             if (profileErr instanceof Error && /user not found|account profile not found/i.test(profileErr.message)) {
-              throw new Error('Firebase recognized your account, but this deployment could not find its LUMIO profile. Your Firebase sign-in still exists. The app database snapshot may be missing or not configured; ask the administrator to check Firestore persistence or restore a database backup. Do not create another Firebase account.');
+              clearTokens();
+              await signOut(firebaseAuth);
+              throw new Error('Your Firebase sign-in worked, but your LUMIO profile is missing. If this is a student account, create the LUMIO profile using the same email and password. Faculty and institute admins must be relinked by institute registration or an administrator.');
             }
             throw profileErr;
           }

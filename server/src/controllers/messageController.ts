@@ -35,7 +35,9 @@ function contactRows(req: AuthRequest): any[] {
 }
 
 export function listMessageContacts(req: AuthRequest, res: Response): void {
-  res.json({ contacts: contactRows(req) });
+  const requestedEmail = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+  const contacts = contactRows(req);
+  res.json({ contacts: requestedEmail ? contacts.filter((contact) => contact.email.toLowerCase() === requestedEmail) : contacts });
 }
 
 export function listConversations(req: AuthRequest, res: Response): void {
@@ -72,21 +74,25 @@ export function getConversationMessages(req: AuthRequest, res: Response): void {
 
 export function sendMessage(req: AuthRequest, res: Response): void {
   const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
-  const recipientId = typeof req.body?.recipientId === 'string' ? req.body.recipientId : '';
+  const requestedRecipientId = typeof req.body?.recipientId === 'string' ? req.body.recipientId : '';
+  const requestedRecipientEmail = typeof req.body?.recipientEmail === 'string' ? req.body.recipientEmail.trim().toLowerCase() : '';
   const clientMessageId = typeof req.body?.clientMessageId === 'string' ? req.body.clientMessageId.slice(0, 100) : null;
   if (!body || body.length > 4000) {
     res.status(400).json({ error: 'Message must contain 1 to 4000 characters.' });
     return;
   }
-  if (!recipientId || recipientId === req.user!.userId) {
+  if ((!requestedRecipientId && !requestedRecipientEmail) || requestedRecipientId === req.user!.userId) {
     res.status(400).json({ error: 'Choose another account to message.' });
     return;
   }
-  const peer = contactRows(req).find((contact) => contact.id === recipientId);
+  const peer = contactRows(req).find((contact) =>
+    requestedRecipientId ? contact.id === requestedRecipientId : contact.email.toLowerCase() === requestedRecipientEmail,
+  );
   if (!peer) {
     res.status(403).json({ error: 'You can only message people connected to your institute or classes.' });
     return;
   }
+  const recipientId = peer.id;
   const instituteId = effectiveInstituteId(req);
   if (!instituteId) {
     res.status(403).json({ error: 'Your account must be linked to an institute or class before messaging.' });

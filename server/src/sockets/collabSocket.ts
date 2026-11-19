@@ -77,15 +77,19 @@ export function setupCollabSockets(io: Server): void {
         return;
       }
 
+      if (session.type === 'peer' && account.role !== 'student') {
+        reject('Peer sessions are only available to students.');
+        return;
+      }
+
       const isHost = session.host_id === account.id;
       const isEnrolled = session.class_id
         ? Boolean(db.prepare('SELECT 1 FROM class_enrollments WHERE class_id = ? AND student_id = ?').get(session.class_id, account.id))
         : false;
 
-      const canJoin =
-        isHost ||
+      const canJoin = isHost ||
         (account.role === 'student' && (!session.class_id || isEnrolled)) ||
-        (account.role === 'teacher' && (!session.class_id || session.teacher_id === account.id)) ||
+        (account.role === 'teacher' && session.type !== 'peer' && (!session.class_id || session.teacher_id === account.id)) ||
         (account.role === 'admin' && Boolean(socketUser.instituteId && session.institute_id === socketUser.instituteId));
 
       if (!canJoin) {

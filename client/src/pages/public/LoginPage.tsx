@@ -21,7 +21,8 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { register, handleSubmit, setValue, formState: { isSubmitting, errors: formErrors } } = useForm<LoginFormData>();
+  const { register, handleSubmit, setValue, watch, formState: { isSubmitting, errors: formErrors } } = useForm<LoginFormData>();
+  const email = watch('email', '');
 
   const onSubmit = async (data: LoginFormData) => {
     setError(null);
@@ -52,7 +53,13 @@ export const LoginPage: React.FC = () => {
         <p className="mt-1.5 text-sm text-brand-muted">Use the email linked to your student or faculty account.</p>
       </div>
 
-      {error && <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm leading-5 text-red-700">{error}</div>}
+      {error && <div role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm leading-5 text-red-700">
+        <p>{error}</p>
+        {error.includes('LUMIO profile is missing') && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-semibold">
+          <Link to="/register" state={{ ...((location.state as any) || {}), prefillEmail: email }} className="underline underline-offset-2">Recreate student profile</Link>
+          <Link to="/institute/register" state={{ prefillEmail: email }} className="underline underline-offset-2">Recreate institute account</Link>
+        </div>}
+      </div>}
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
         <div>

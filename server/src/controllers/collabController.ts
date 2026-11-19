@@ -19,6 +19,10 @@ export function createSession(req: AuthRequest, res: Response): void {
       res.status(400).json({ error: 'Session type must be peer, faculty, or class.' });
       return;
     }
+    if (sessionType === 'peer' && req.user!.role !== 'student') {
+      res.status(403).json({ error: 'Peer sessions are only available to students.' });
+      return;
+    }
     // Faculty and class sessions require a teacher or institute administrator.
     if ((sessionType === 'faculty' || sessionType === 'class') && !['teacher', 'admin'].includes(req.user!.role)) {
       res.status(403).json({ error: 'Only faculty can create faculty or class sessions.' });
@@ -63,6 +67,11 @@ export function listSessions(req: AuthRequest, res: Response): void {
   const user = req.user!;
   const { type, classId } = req.query as any;
 
+  if (user.role === 'teacher' && type === 'peer') {
+    res.status(403).json({ error: 'Peer sessions are only available to students.' });
+    return;
+  }
+
   let query = `
     SELECT cs.*, u.name as host_name, u.role as host_role,
       CASE WHEN c.name IS NOT NULL THEN c.name ELSE NULL END as class_name
@@ -81,7 +90,7 @@ export function listSessions(req: AuthRequest, res: Response): void {
     query += ' AND (cs.host_id = ? OR cs.type = \'peer\' OR (u.institute_id = ? AND ? IS NOT NULL) OR cs.class_id IN (SELECT class_id FROM class_enrollments WHERE student_id = ?))';
     params.push(user.userId, user.instituteId, user.instituteId, user.userId);
   } else if (user.role === 'teacher') {
-    query += ' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR c.teacher_id = ?)';
+    query += ' AND cs.type <> \'peer\' AND (cs.host_id = ? OR (u.institute_id = ? AND ? IS NOT NULL) OR c.teacher_id = ?)';
     params.push(user.userId, user.instituteId, user.instituteId, user.userId);
   } else if (user.role === 'admin') {
     if (!user.instituteId) {
@@ -114,6 +123,10 @@ export function getSession(req: AuthRequest, res: Response): void {
   }
 
   const user = req.user!;
+  if (session.type === 'peer' && user.role !== 'student') {
+    res.status(403).json({ error: 'Peer sessions are only available to students.' });
+    return;
+  }
   if (session.class_id) {
     const cls = db.prepare('SELECT teacher_id, institute_id FROM classes WHERE id = ?').get(session.class_id) as any;
     const allowed = user.role === 'student'

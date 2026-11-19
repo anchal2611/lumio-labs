@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Users, FlaskConical, ClipboardList, ChevronRight, Loader2, Copy, Check, RefreshCw, GraduationCap, BookOpen } from 'lucide-react';
+import { ArrowLeft, Users, FlaskConical, ClipboardList, ChevronRight, Loader2, Copy, Check, RefreshCw, GraduationCap, BookOpen, MessageSquare } from 'lucide-react';
 import { apiGet, apiPatch } from '../../services/api';
 
 interface ClassDetail {
@@ -146,7 +146,7 @@ export const TeacherClassDetail: React.FC = () => {
                 <p className="text-white font-medium">{s.name}</p>
                 <p className="text-slate-500 text-xs">{s.email} {s.roll_number ? `• ${s.roll_number}` : ''} {s.branch ? `• ${s.branch}` : ''}</p>
               </div>
-              <p className="text-slate-600 text-xs">{new Date(s.enrolled_at).toLocaleDateString()}</p>
+              <div className="ml-auto flex shrink-0 items-center gap-3"><p className="text-slate-600 text-xs">{new Date(s.enrolled_at).toLocaleDateString()}</p><Link to={`/teacher/messages?to=${encodeURIComponent(s.id)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-teal-500 hover:text-white"><MessageSquare className="h-3.5 w-3.5" />Message</Link></div>
             </div>
           ))}
         </div>

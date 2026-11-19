@@ -36,7 +36,7 @@ const TAB_INFO = [
 export const CollabHub: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('peer');
+  const [activeTab, setActiveTab] = useState(user?.role === 'teacher' ? 'faculty' : 'peer');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
@@ -58,6 +58,11 @@ export const CollabHub: React.FC = () => {
   const [sendingChat, setSendingChat] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const visibleTabs = user?.role === 'teacher' ? TAB_INFO.filter((tab) => tab.key !== 'peer') : TAB_INFO;
+
+  useEffect(() => {
+    if (user?.role === 'teacher' && activeTab === 'peer') setActiveTab('faculty');
+  }, [user?.role, activeTab]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -424,7 +429,7 @@ export const CollabHub: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">Collaboration Hub</h1>
           <p className="text-slate-400 mt-1">Real-time coding sessions with smart line-locking and live presence</p>
         </div>
-        {(activeTab === 'peer' || (activeTab !== 'class' && user?.role === 'teacher')) && (
+        {((user?.role === 'student' && activeTab === 'peer') || (user?.role === 'teacher' && activeTab === 'faculty')) && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20"
@@ -436,7 +441,7 @@ export const CollabHub: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-900 p-1 rounded-xl mb-6 w-fit">
-        {TAB_INFO.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button

@@ -5,7 +5,6 @@ import { apiGet, apiPatch, getAuthToken } from '../services/api';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { config } from '../config/env';
-import { subscribeToUserNotifications, subscribeToRealtimeClasses } from '../services/firebase';
 
 export interface AppNotification {
   id: string;
@@ -31,7 +30,7 @@ const NotificationContext = createContext<NotificationContextValue | undefined>(
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const toast = useToast();
+  const { info: showInfoToast, success: showSuccessToast } = useToast();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -64,6 +63,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [user, loadNotifications]);
 
+  // Keep the inbox current if a WebSocket reconnects late or the tab was asleep.
+  useEffect(() => {
+    if (!user) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void loadNotifications();
+    };
+    const timer = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [user, loadNotifications]);
+
   // 1. Socket.IO Real-Time Push Connection
   useEffect(() => {
     if (!user) {
@@ -72,97 +85,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
-    const token = getAuthToken();
-    if (!token) return;
+    let disposed = false;
+    let socket: Socket | null = null;
+    void getAuthToken().then((token) => {
+      if (disposed || !token) return;
 
-    const socketUrl = config.socketUrl || 'http://localhost:5000';
-    const socket = io(socketUrl, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-    });
-    socketRef.current = socket;
+      socket = io(config.socketUrl, {
+        auth: { token },
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
+      });
+      socketRef.current = socket;
 
-    // Real-time user targeted notification
-    socket.on('notification', (newNotif: AppNotification) => {
-      if (!newNotif || !newNotif.id) return;
-      if (seenIdsRef.current.has(newNotif.id)) return;
-      seenIdsRef.current.add(newNotif.id);
-
-      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
-      toast.info(newNotif.title, newNotif.body);
-    });
-
-    // Real-time global notification broadcast event
-    socket.on('realtime_notification', ({ userId, notification }: { userId: string; notification: AppNotification }) => {
-      if (userId !== user.id) return;
-      if (!notification || !notification.id || seenIdsRef.current.has(notification.id)) return;
-      seenIdsRef.current.add(notification.id);
-
-      setNotifications((prev) => [notification, ...prev.filter((n) => n.id !== notification.id)]);
-      toast.info(notification.title, notification.body);
-    });
-
-    // Real-time class created broadcast
-    socket.on('class_created', (data: { name: string; subject: string; teacherName: string; joinCode: string }) => {
-      if (user.role === 'student') {
-        toast.success(
-          `New Class: ${data.name}`,
-          `${data.teacherName} published ${data.subject}. Join with code: ${data.joinCode}`
-        );
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [user, toast]);
-
-  // 2. Firebase Firestore Real-Time Database Connection
-  useEffect(() => {
-    if (!user?.id) return;
-
-    // Listen to Firebase Firestore notifications
-    const unsubNotifications = subscribeToUserNotifications(user.id, (fbNotif) => {
-      if (!fbNotif || !fbNotif.id) return;
-      if (seenIdsRef.current.has(fbNotif.id)) return;
-      seenIdsRef.current.add(fbNotif.id);
-
-      const formatted: AppNotification = {
-        id: fbNotif.id,
-        type: fbNotif.type || 'info',
-        title: fbNotif.title || 'Notification',
-        body: fbNotif.body || '',
-        link: fbNotif.link || null,
-        read_at: fbNotif.read_at || null,
-        created_at: fbNotif.created_at || new Date().toISOString(),
+      const acceptNotification = (notification: AppNotification) => {
+        if (!notification?.id || seenIdsRef.current.has(notification.id)) return;
+        seenIdsRef.current.add(notification.id);
+        setNotifications((previous) => [notification, ...previous.filter((item) => item.id !== notification.id)]);
+        showInfoToast(notification.title, notification.body);
       };
 
-      setNotifications((prev) => [formatted, ...prev.filter((n) => n.id !== formatted.id)]);
-      toast.info(formatted.title, formatted.body);
-    });
-
-    // Listen to Firebase Firestore classes
-    const unsubClasses = subscribeToRealtimeClasses((fbClass) => {
-      if (user.role === 'student' && fbClass?.name && fbClass?.teacher_id !== user.id) {
-        // If class was created within the last 15 seconds, display banner
-        const isRecent = fbClass.created_at && (Date.now() - new Date(fbClass.created_at).getTime() < 15000);
-        if (isRecent) {
-          toast.success(
-            `New Class: ${fbClass.name}`,
-            `${fbClass.teacher_name || 'Instructor'} published "${fbClass.name}". Code: ${fbClass.join_code}`
-          );
+      socket.on('notification', acceptNotification);
+      socket.on('realtime_notification', ({ userId, notification }: { userId: string; notification: AppNotification }) => {
+        if (userId === user.id) acceptNotification(notification);
+      });
+      socket.on('class_created', (data: { name: string; subject: string; teacherName: string; joinCode: string }) => {
+        if (user.role === 'student') {
+          showSuccessToast(`New Class: ${data.name}`, `${data.teacherName} published ${data.subject}. Join with code: ${data.joinCode}`);
         }
-      }
-    });
+      });
+    }).catch(() => {});
 
     return () => {
-      unsubNotifications?.();
-      unsubClasses?.();
+      disposed = true;
+      socket?.disconnect();
+      if (socketRef.current === socket) socketRef.current = null;
     };
-  }, [user, toast]);
+  }, [user, showInfoToast, showSuccessToast]);
 
   const markAsRead = async (id: string) => {
     try {

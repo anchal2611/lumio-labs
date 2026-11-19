@@ -42,6 +42,7 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
 
     let teacherId = uuid();
     let firebaseUserCreated = false;
+    let firebaseUserNeedsPasswordUpdate = false;
     if (hasFirebaseAdminCredentials) {
       try {
         const firebaseUser = await firebaseAdminAuth.createUser({
@@ -51,10 +52,19 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
         firebaseUserCreated = true;
       } catch (err: any) {
         if (err?.code === 'auth/email-already-exists') {
-          res.status(409).json({ error: 'A Firebase account with this email already exists.' });
-          return;
+          const firebaseUser = await firebaseAdminAuth.getUserByEmail(normalizedEmail);
+          const linkedAccount = db.prepare('SELECT id FROM users WHERE id = ?').get(firebaseUser.uid);
+          if (linkedAccount) {
+            res.status(409).json({ error: 'This Firebase account is already linked to a LUMIO user.' });
+            return;
+          }
+          // Reattach an orphaned Firebase identity after an application database reset.
+          // The institute admin supplies a new initial password in this form.
+          teacherId = firebaseUser.uid;
+          firebaseUserNeedsPasswordUpdate = true;
+        } else {
+          throw err;
         }
-        throw err;
       }
     }
 
@@ -75,6 +85,18 @@ export async function createTeacher(req: AuthRequest, res: Response): Promise<vo
     } catch (err) {
       if (firebaseUserCreated) await firebaseAdminAuth.deleteUser(teacherId).catch(() => {});
       throw err;
+    }
+
+    if (firebaseUserNeedsPasswordUpdate) {
+      try {
+        await firebaseAdminAuth.updateUser(teacherId, { password, displayName: name.trim() });
+      } catch (err) {
+        db.transaction(() => {
+          db.prepare('DELETE FROM teacher_profiles WHERE user_id = ?').run(teacherId);
+          db.prepare('DELETE FROM users WHERE id = ?').run(teacherId);
+        })();
+        throw err;
+      }
     }
 
     res.status(201).json({

@@ -25,6 +25,7 @@ let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let remoteSavePromise: Promise<void> | null = null;
 let remoteDirty = false;
 let remoteSaveError: string | null = null;
+let databaseStartupSource: 'not_initialized' | 'firestore_snapshot' | 'local_file' | 'fresh_database' = 'not_initialized';
 
 /** Persist the current state in the local working directory. */
 function saveLocalDatabase(): void {
@@ -77,8 +78,12 @@ export async function flushDatabaseSnapshot(): Promise<void> {
   if (remoteDirty) await flushDatabaseSnapshot();
 }
 
-export function getDatabasePersistenceStatus(): { mode: 'firestore' | 'local'; error: string | null } {
-  return { mode: config.remoteDatabasePersistence && hasFirebaseAdminCredentials ? 'firestore' : 'local', error: remoteSaveError };
+export function getDatabasePersistenceStatus(): { mode: 'firestore' | 'local'; error: string | null; startupSource: string } {
+  return {
+    mode: config.remoteDatabasePersistence && hasFirebaseAdminCredentials ? 'firestore' : 'local',
+    error: remoteSaveError,
+    startupSource: databaseStartupSource,
+  };
 }
 
 function saveDatabase(): void {
@@ -175,13 +180,19 @@ export async function initDatabase(): Promise<void> {
   const remoteSnapshot = config.remoteDatabasePersistence ? await readSqliteSnapshot() : null;
   if (remoteSnapshot) {
     sqlDb = new SQL.Database(remoteSnapshot);
+    databaseStartupSource = 'firestore_snapshot';
     console.log(`Restored SQLite database from Firestore (${remoteSnapshot.byteLength} bytes).`);
   } else if (fs.existsSync(dbPath)) {
     const buf = fs.readFileSync(dbPath);
     sqlDb = new SQL.Database(buf);
+    databaseStartupSource = 'local_file';
     console.log('Loaded existing database from: ' + dbPath);
   } else {
     sqlDb = new SQL.Database();
+    databaseStartupSource = 'fresh_database';
+    if (config.remoteDatabasePersistence) {
+      console.warn('No Firestore snapshot or local database was found. Starting with a fresh application database.');
+    }
     console.log('Created new database at: ' + dbPath);
   }
 

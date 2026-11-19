@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Globe, Loader2, Plus, User, X } from 'lucide-react';
 import { apiPost } from '../../services/api';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
@@ -11,16 +11,17 @@ const fieldClass = 'mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-whi
 
 export const InstituteRegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState('');
   const [result, setResult] = useState<any>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     instituteName: '', type: 'university', city: '', website: '',
-    adminName: '', adminEmail: '', adminPassword: '', confirmPassword: '',
+    adminName: '', adminEmail: (location.state as any)?.prefillEmail || '', adminPassword: '', confirmPassword: '',
     emailDomains: [] as string[],
-  });
+  }));
 
   const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
 

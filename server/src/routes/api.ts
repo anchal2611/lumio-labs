@@ -40,6 +40,7 @@ apiRouter.get('/health', (_req, res) => {
     codeExecutionConfigured: Boolean(config.judge0.apiKey) || isPublicJudge0Endpoint(),
     databasePersistence: persistence.mode,
     databasePersistenceHealthy: !persistence.error,
+    databaseStartupSource: persistence.startupSource,
   });
 });
 

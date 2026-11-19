@@ -26,7 +26,9 @@ export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [domainCheck, setDomainCheck] = useState<{ matched: boolean; institute?: { name: string } } | null>(null);
   const [checkingDomain, setCheckingDomain] = useState(false);
-  const { register, handleSubmit, watch, formState: { isSubmitting, errors: formErrors } } = useForm<RegisterForm>();
+  const { register, handleSubmit, watch, formState: { isSubmitting, errors: formErrors } } = useForm<RegisterForm>({
+    defaultValues: { email: (location.state as any)?.prefillEmail || '' },
+  });
 
   const watchEmail = watch('email');
   const watchPassword = watch('password');
