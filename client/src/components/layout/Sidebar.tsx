@@ -125,16 +125,11 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* University Terminal Footer */}
+      {/* Workspace footer */}
       <div className="hidden lg:block p-4 border-t border-slate-100">
         <div className="p-3 bg-brand-canvas rounded-xl border border-slate-200/80 text-left">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span className="text-[11px] font-semibold text-navy-900">Virtual Lab Online</span>
-          </div>
-          <p className="text-[10px] text-brand-muted mt-1">
-            Sandbox & SQLite WASM Ready
-          </p>
+          <p className="text-[11px] font-semibold text-navy-900">LUMIO workspace</p>
+          <p className="mt-1 text-[10px] text-brand-muted">Classes, labs, and coursework</p>
         </div>
       </div>
     </aside>

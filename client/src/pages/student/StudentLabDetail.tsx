@@ -12,7 +12,6 @@ import {
   RotateCcw,
   BookOpen,
   Code2,
-  Sparkles,
   Download,
   AlertCircle,
   Box,
@@ -20,7 +19,6 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost } from '../../services/api';
 import { config } from '../../config/env';
-import { MOCK_LABS, MOCK_GUIDED_PRACTICALS } from '../../services/mockData';
 import { SqlWorkspace } from '../../components/labs/SqlWorkspace';
 import { CircuitWorkspace } from '../../components/labs/CircuitWorkspace';
 import { GuidedPracticalPanel } from '../../components/labs/GuidedPracticalPanel';
@@ -85,12 +83,9 @@ export const StudentLabDetail: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
 
-  // Check if it's one of the built-in university mock labs
-  const mockLab = MOCK_LABS.find((l) => l.id === labId);
-
   // State for database-backed lab module
   const [dbLab, setDbLab] = useState<DbLabModule | null>(null);
-  const [loadingDb, setLoadingDb] = useState(Boolean(!mockLab && labId));
+  const [loadingDb, setLoadingDb] = useState(Boolean(labId));
   const [loadError, setLoadError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [activeExIdx, setActiveExIdx] = useState(0);
@@ -104,16 +99,8 @@ export const StudentLabDetail: React.FC = () => {
   const [viewMode, setViewMode] = useState<'code' | 'split' | '3d'>('split');
   const [iotViewTab, setIotViewTab] = useState<'3d' | 'breadboard'>('3d');
 
-  // State for mock guided/workspace lab mode
-  const [guidedMode, setGuidedMode] = useState<'guided' | 'workspace'>('guided');
-  const practicals = mockLab ? MOCK_GUIDED_PRACTICALS[mockLab.id] || [] : [];
-  const currentPractical = practicals[0] || null;
-  const [mockWorkspaceCode, setMockWorkspaceCode] = useState(
-    currentPractical?.starterCode || (mockLab ? `// LUMIO Virtual Lab: ${mockLab.name}\n// Write your code below\n` : '')
-  );
-
   useEffect(() => {
-    if (mockLab || !labId) {
+    if (!labId) {
       setLoadingDb(false);
       setLoadError('');
       setDbLab(null);
@@ -146,7 +133,7 @@ export const StudentLabDetail: React.FC = () => {
     return () => {
       isCurrentRequest = false;
     };
-  }, [labId, mockLab, loadAttempt]);
+  }, [labId, loadAttempt]);
 
   // 1. Specialized Engine: SQL Lab
   if (labId === 'lab-sql') {
@@ -233,159 +220,6 @@ export const StudentLabDetail: React.FC = () => {
           </div>
         ) : (
           <CircuitWorkspace />
-        )}
-      </div>
-    );
-  }
-
-  // 3. Built-in University Coding Labs (Python, C++, Web, etc.)
-  if (mockLab) {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
-              onClick={() => navigate('/student/labs')}
-            >
-              Back to Labs
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-navy-900 tracking-tight">{mockLab.name}</h1>
-                <Badge variant="aqua" size="sm">Interactive Lab</Badge>
-              </div>
-              <p className="text-xs text-brand-muted mt-0.5">{mockLab.tagline}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* View Mode Toggle: Code, Split with 3D, or 3D Only */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setViewMode('code')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === 'code' ? 'bg-white text-navy-900 shadow-xs' : 'text-brand-muted hover:text-navy-900'
-                }`}
-                title="Code Only"
-              >
-                <Code2 className="w-3.5 h-3.5" />
-                <span>Code Only</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('split')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === 'split' ? 'bg-white text-primary shadow-xs' : 'text-brand-muted hover:text-navy-900'
-                }`}
-                title="Split View: Code + 3D Model on Right"
-              >
-                <Box className="w-3.5 h-3.5 text-blue-600" />
-                <span>Split + 3D Model</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('3d')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === '3d' ? 'bg-white text-primary shadow-xs' : 'text-brand-muted hover:text-navy-900'
-                }`}
-                title="3D Model Full View"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-                <span>3D Model</span>
-              </button>
-            </div>
-
-            {currentPractical && (
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setGuidedMode('guided')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    guidedMode === 'guided'
-                      ? 'bg-white text-primary shadow-xs'
-                      : 'text-brand-muted hover:text-navy-900'
-                  }`}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Guided Practicals</span>
-                </button>
-                <button
-                  onClick={() => setGuidedMode('workspace')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    guidedMode === 'workspace'
-                      ? 'bg-white text-navy-900 shadow-xs'
-                      : 'text-brand-muted hover:text-navy-900'
-                  }`}
-                >
-                  <Code2 className="w-3.5 h-3.5" />
-                  <span>Workspace</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {guidedMode === 'guided' && currentPractical ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[760px]">
-            <div className="lg:col-span-4 h-full">
-              <GuidedPracticalPanel
-                practical={currentPractical}
-                onApplyStarterCode={() => {
-                  setMockWorkspaceCode(currentPractical.starterCode);
-                  toast.info('Starter Code Restored');
-                }}
-              />
-            </div>
-            <div className="lg:col-span-8 h-full flex overflow-hidden gap-3">
-              {viewMode !== '3d' && (
-                <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-                  <MonacoWorkspace
-                    initialCode={mockWorkspaceCode}
-                    language={currentPractical.defaultLanguage}
-                    labTitle={mockLab.name}
-                    onCodeChange={setMockWorkspaceCode}
-                    onSubmitPractical={() => toast.success('Practical Evaluation Submitted!')}
-                    isGuidedMode={true}
-                  />
-                </div>
-              )}
-              {viewMode !== 'code' && (
-                <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-                  <Lab3DModelViewer
-                    key={`mock-guided-${mockLab.id}-${getModelPresetForLab(mockLab)}`}
-                    initialPreset={getModelPresetForLab(mockLab)}
-                    title={`${mockLab.name} — 3D Visualizer`}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="h-[760px] flex overflow-hidden gap-3">
-            {viewMode !== '3d' && (
-              <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-                <MonacoWorkspace
-                  initialCode={mockWorkspaceCode}
-                  language={(mockLab.languages?.[0] as any) || 'python'}
-                  labTitle={mockLab.name}
-                  onCodeChange={setMockWorkspaceCode}
-                  isGuidedMode={false}
-                />
-              </div>
-            )}
-            {viewMode !== 'code' && (
-              <div className={`h-full ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-                <Lab3DModelViewer
-                  key={`mock-ws-${mockLab.id}-${getModelPresetForLab(mockLab)}`}
-                  initialPreset={getModelPresetForLab(mockLab)}
-                  title={`${mockLab.name} — 3D Workspace`}
-                />
-              </div>
-            )}
-          </div>
         )}
       </div>
     );

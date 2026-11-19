@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Loader2, MessageSquare, Sparkles, AlertCircle } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, MessageSquare, Building2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useNotifications, AppNotification } from '../../contexts/NotificationContext';
@@ -22,10 +22,10 @@ export const NotificationsPage: React.FC = () => {
         <div>
           <div className="mb-1 flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-navy-900 sm:text-2xl">Real-Time Notifications</h1>
+            <h1 className="text-xl font-bold text-navy-900 sm:text-2xl">Notifications</h1>
           </div>
           <p className="text-sm text-brand-muted">
-            Live broadcasts: course releases, collaborative editing permissions, assignment evaluations, and class alerts.
+            Updates about classes, lab work, grades, and messages.
           </p>
         </div>
         <Button
@@ -42,7 +42,7 @@ export const NotificationsPage: React.FC = () => {
       {loading ? (
         <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-brand-muted">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Synchronizing notifications from Firebase & Server...
+          Loading notifications…
         </div>
       ) : notifications.length ? (
         <div className="space-y-3">
@@ -67,7 +67,7 @@ export const NotificationsPage: React.FC = () => {
                     }`}
                   >
                     {notification.type === 'class_created' ? (
-                      <Sparkles className="h-4 w-4" />
+                      <Building2 className="h-4 w-4" />
                     ) : notification.type === 'collab_permission' ? (
                       <MessageSquare className="h-4 w-4" />
                     ) : (
@@ -97,7 +97,7 @@ export const NotificationsPage: React.FC = () => {
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
           <Bell className="mx-auto mb-3 h-9 w-9 text-slate-300" />
           <h2 className="font-semibold text-navy-900">You’re all caught up</h2>
-          <p className="mt-1 text-sm text-brand-muted">New class announcements and collaboration updates will pop up here in real time.</p>
+          <p className="mt-1 text-sm text-brand-muted">New updates will appear here.</p>
         </div>
       )}
     </div>

@@ -8,7 +8,6 @@ import {
   Columns,
   Key,
   Clock,
-  Sparkles,
   AlertCircle,
   History,
   Copy,

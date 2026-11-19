@@ -8,7 +8,6 @@ import {
   User,
   Settings,
   ChevronDown,
-  Sparkles,
   Layers,
   FlaskConical,
 } from 'lucide-react';

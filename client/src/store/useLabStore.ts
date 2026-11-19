@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { LabItem, GuidedPractical, SupportedLanguage } from '../types/lab';
 import { Experiment } from '../types/experiment';
-import { MOCK_LABS, MOCK_GUIDED_PRACTICALS } from '../services/mockData';
 
 interface LabState {
   labs: LabItem[];
+  currentUserId: string;
   selectedCategory: string;
   searchQuery: string;
   activeLab: LabItem | null;
@@ -20,6 +20,7 @@ interface LabState {
 
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
+  setCurrentUserId: (userId: string) => void;
   setActiveLab: (lab: LabItem | null) => void;
   setActiveMode: (mode: 'guided' | 'workspace') => void;
   setActivePractical: (practical: GuidedPractical | null) => void;
@@ -33,33 +34,15 @@ interface LabState {
 }
 
 export const useLabStore = create<LabState>((set) => ({
-  labs: MOCK_LABS,
+  labs: [],
+  currentUserId: '',
   selectedCategory: 'all',
   searchQuery: '',
-  activeLab: MOCK_LABS[0],
+  activeLab: null,
   activeMode: 'guided',
-  activePractical: MOCK_GUIDED_PRACTICALS['lab-python']?.[0] || null,
-  savedExperiments: [
-    {
-      id: 'exp-01',
-      userId: 'usr_student_01',
-      labId: 'lab-python',
-      title: 'Searching Algorithms Benchmark',
-      language: 'python',
-      code: MOCK_GUIDED_PRACTICALS['lab-python']?.[0]?.starterCode || '',
-      files: [{ name: 'main.py', content: MOCK_GUIDED_PRACTICALS['lab-python']?.[0]?.starterCode || '', language: 'python' }],
-      lastStdout: '=== LUMIO VIRTUAL LAB: SEARCH ALGORITHMS ===\nDataset: [12, 24, 35, 47, 59, 68, 77, 88, 99]\n[Result] Linear Search Found at Index: 5\n[Result] Binary Search Found at Index: 5',
-      executionStatus: 'success',
-      executionTimeMs: 24,
-      memoryKb: 4120,
-      isSaved: true,
-      isShared: false,
-      createdAt: '2026-10-30T10:00:00Z',
-      updatedAt: '2026-10-31T12:00:00Z',
-      tags: ['Python', 'DSA'],
-    },
-  ],
-  currentCode: MOCK_GUIDED_PRACTICALS['lab-python']?.[0]?.starterCode || '',
+  activePractical: null,
+  savedExperiments: [],
+  currentCode: '',
   currentLanguage: 'python',
   terminalOutput: '',
   terminalStderr: '',
@@ -68,19 +51,18 @@ export const useLabStore = create<LabState>((set) => ({
 
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setCurrentUserId: (userId) => set({ currentUserId: userId }),
   setActiveLab: (lab) => {
     if (!lab) {
       set({ activeLab: null, activePractical: null });
       return;
     }
-    const practicals = MOCK_GUIDED_PRACTICALS[lab.id];
-    const defaultPractical = practicals && practicals.length > 0 ? practicals[0] : null;
     const defaultLang = lab.languages[0] || 'python';
     set({
       activeLab: lab,
-      activePractical: defaultPractical,
+      activePractical: null,
       currentLanguage: defaultLang,
-      currentCode: defaultPractical?.starterCode || `// Welcome to LUMIO ${lab.name}\n// Mode: Open Workspace\n\n`,
+      currentCode: '',
       terminalOutput: '',
       terminalStderr: '',
     });
@@ -104,7 +86,7 @@ export const useLabStore = create<LabState>((set) => ({
     set((state) => {
       const newExp: Experiment = {
         id: `exp-${Date.now()}`,
-        userId: 'usr_student_01',
+        userId: state.currentUserId,
         labId: state.activeLab?.id || 'lab-custom',
         title: expData.title || `${state.activeLab?.name || 'Experiment'} ${state.savedExperiments.length + 1}`,
         language: state.currentLanguage,

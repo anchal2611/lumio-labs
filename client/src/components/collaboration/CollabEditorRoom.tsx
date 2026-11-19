@@ -4,7 +4,6 @@ import {
   Users,
   Send,
   MessageSquare,
-  Sparkles,
   Share2,
   Lock,
   Globe,

@@ -73,11 +73,11 @@ export const AdminDashboard: React.FC = () => {
         {/* Status Badge */}
         <div className="relative z-10 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-center min-w-[200px]">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">Workspace Online</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${loadError ? 'bg-red-400' : stats ? 'bg-emerald-400' : 'bg-amber-300'}`} />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">{loadError ? 'Data unavailable' : stats ? 'Institute data' : 'Loading data'}</span>
           </div>
-          <p className="text-[11px] text-slate-300">Institute data loaded from the API</p>
-          <Badge variant="aqua" size="sm" className="mt-3">Live institute data</Badge>
+          <p className="text-[11px] text-slate-300">{loadError ? 'Could not load the institute overview.' : stats ? 'Current account and class totals.' : 'Getting the latest totals.'}</p>
+          {stats && <Badge variant="aqua" size="sm" className="mt-3">Overview loaded</Badge>}
         </div>
       </div>
 

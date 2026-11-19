@@ -347,7 +347,7 @@ export const CollabHub: React.FC = () => {
         {/* Main area: Editor & Chat Split */}
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Collaborative Monaco Editor with Smart Line Locking */}
+            {/* Shared code editor with line locking */}
             <div className="flex-1 overflow-hidden">
               <CollaborativeEditor
                 socket={socket}
@@ -427,7 +427,7 @@ export const CollabHub: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Collaboration Hub</h1>
-          <p className="text-slate-400 mt-1">Real-time coding sessions with smart line-locking and live presence</p>
+          <p className="text-slate-400 mt-1">Code together in live sessions and see who is connected.</p>
         </div>
         {((user?.role === 'student' && activeTab === 'peer') || (user?.role === 'teacher' && activeTab === 'faculty')) && (
           <button

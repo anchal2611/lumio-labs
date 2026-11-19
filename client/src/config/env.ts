@@ -69,8 +69,8 @@ function resolveSocketUrl(value?: string): string {
 
 export const config: AppConfig = {
   appName: rawEnv.VITE_APP_NAME || 'LUMIO',
-  tagline: rawEnv.VITE_APP_TAGLINE || 'Virtual Labs. Limitless Learning.',
-  brandStatement: rawEnv.VITE_APP_BRAND_STATEMENT || 'Explore. Experiment. Execute.',
+  tagline: rawEnv.VITE_APP_TAGLINE || 'Labs and coursework for your campus',
+  brandStatement: rawEnv.VITE_APP_BRAND_STATEMENT || 'A campus lab workspace',
   env: rawEnv.VITE_APP_ENV || 'development',
   isDemoMode: rawEnv.VITE_ENABLE_DEMO_MODE !== 'false',
   enableIotLab: rawEnv.VITE_ENABLE_IOT_LAB !== 'false',

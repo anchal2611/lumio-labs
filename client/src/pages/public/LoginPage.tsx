@@ -46,7 +46,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <PublicAuthLayout panelTitle="Welcome back to your lab." panelDescription="Pick up where your classes, practicals, and team work come together.">
+    <PublicAuthLayout panelTitle="Sign in to your account." panelDescription="Open your classes, labs, and messages.">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">LUMIO account</p>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-navy-900">Sign in</h2>

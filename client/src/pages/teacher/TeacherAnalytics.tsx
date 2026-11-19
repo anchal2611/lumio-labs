@@ -1,111 +1,128 @@
-import React from 'react';
-import { BarChart3, TrendingUp, Users, CheckCircle2, Award, Sparkles } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import React, { useEffect, useState } from 'react';
+import { BarChart3, BookOpen, ClipboardList, GraduationCap, Loader2, Users } from 'lucide-react';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { apiGet } from '../../services/api';
+
+type AnalyticsSummary = {
+  class_count: number;
+  student_count: number;
+  assignment_count: number;
+  submission_count: number;
+  graded_count: number;
+  average_score: number | null;
+  on_time_count: number;
+  due_date_submission_count: number;
+};
+
+type LabAnalytics = {
+  id: string;
+  title: string;
+  assignment_count: number;
+  submission_count: number;
+  graded_count: number;
+  average_score: number | null;
+  on_time_count: number | null;
+  due_date_submission_count: number | null;
+};
+
+const formatPercent = (value: number | null | undefined) =>
+  value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : `${Number(value).toFixed(1)}%`;
 
 export const TeacherAnalytics: React.FC = () => {
-  const labMetrics = [
-    { name: 'Python Computing & Algorithms', avgScore: '88.4%', submissions: 42, onTime: '95%' },
-    { name: 'C / C++ Systems Lab', avgScore: '84.2%', submissions: 38, onTime: '89%' },
-    { name: 'Relational DBMS & SQL Lab', avgScore: '91.0%', submissions: 41, onTime: '98%' },
-    { name: 'IoT & Virtual Circuit Laboratory', avgScore: '86.7%', submissions: 35, onTime: '92%' },
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [labs, setLabs] = useState<LabAnalytics[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    apiGet<{ summary: AnalyticsSummary; labs: LabAnalytics[] }>('/teacher/analytics')
+      .then((data) => {
+        if (!active) return;
+        setSummary(data.summary);
+        setLabs(data.labs || []);
+      })
+      .catch((reason) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Could not load analytics.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const metrics = [
+    { label: 'Classes', value: summary?.class_count, icon: BookOpen },
+    { label: 'Students', value: summary?.student_count, icon: Users },
+    { label: 'Assignments', value: summary?.assignment_count, icon: ClipboardList },
+    { label: 'Submissions', value: summary?.submission_count, icon: GraduationCap },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-5 h-5 text-teal-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-              Class Academic Analytics
-            </h1>
-          </div>
-          <p className="text-xs text-brand-muted">
-            Aggregated laboratory completion benchmarks, grade distribution, and practical timings
-          </p>
+      <header>
+        <div className="mb-1 flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-teal-600" />
+          <h1 className="text-xl font-bold tracking-tight text-navy-900 sm:text-2xl">Class activity</h1>
         </div>
+        <p className="text-sm text-brand-muted">Assignment submissions and grades from your classes.</p>
+      </header>
 
-        <Badge variant="aqua" size="md">
-          Spring Term 2026 Batch
-        </Badge>
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {metrics.map(({ label, value, icon: Icon }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center gap-3 p-4">
+              <Icon className="h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="text-xs text-brand-muted">{label}</p>
+                <p className="text-lg font-semibold text-navy-900">{loading ? '—' : value ?? 0}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Top 3 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-brand-muted font-medium">Department Class Average</p>
-              <h3 className="text-2xl font-extrabold text-navy-900 mt-0.5">87.6%</h3>
-              <span className="text-[10px] text-emerald-600 font-bold">+3.2% vs last semester</span>
-            </div>
-          </CardContent>
-        </Card>
+      {summary && summary.submission_count > 0 && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card><CardContent className="p-4"><p className="text-xs text-brand-muted">Average score</p><p className="mt-1 text-xl font-semibold text-navy-900">{formatPercent(summary.average_score)}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xs text-brand-muted">Graded submissions</p><p className="mt-1 text-xl font-semibold text-navy-900">{summary.graded_count} / {summary.submission_count}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-xs text-brand-muted">Submitted by due date</p><p className="mt-1 text-xl font-semibold text-navy-900">{summary.due_date_submission_count ? formatPercent(summary.on_time_count * 100 / summary.due_date_submission_count) : '—'}</p></CardContent></Card>
+        </div>
+      )}
 
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-brand-muted font-medium">On-Time Submissions</p>
-              <h3 className="text-2xl font-extrabold text-navy-900 mt-0.5">93.5%</h3>
-              <span className="text-[10px] text-emerald-600 font-bold">142 of 152 on schedule</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-slate-200/80">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Award className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-brand-muted font-medium">Viva Voce Accuracy</p>
-              <h3 className="text-2xl font-extrabold text-navy-900 mt-0.5">91.2%</h3>
-              <span className="text-[10px] text-amber-700 font-bold">Strong conceptual grasp</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Lab Breakdown Table */}
-      <Card className="border border-slate-200/80">
-        <CardHeader>
-          <CardTitle>Per-Laboratory Performance Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-100/70 text-navy-900 uppercase text-[10px] font-bold border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">Laboratory Name</th>
-                <th className="p-3.5">Submissions</th>
-                <th className="p-3.5">Average Score</th>
-                <th className="p-3.5">On-Time Rate</th>
-                <th className="p-3.5">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {labMetrics.map((m) => (
-                <tr key={m.name} className="hover:bg-slate-50">
-                  <td className="p-3.5 font-bold text-navy-900">{m.name}</td>
-                  <td className="p-3.5 font-mono text-slate-700">{m.submissions} / 45</td>
-                  <td className="p-3.5 font-bold text-teal-700">{m.avgScore}</td>
-                  <td className="p-3.5 text-slate-700">{m.onTime}</td>
-                  <td className="p-3.5">
-                    <Badge variant="success" size="sm">
-                      Satisfactory
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
+      <Card className="overflow-hidden">
+        <div className="border-b border-slate-200 px-4 py-3 sm:px-5">
+          <h2 className="text-sm font-semibold text-navy-900">Labs with assignments</h2>
+        </div>
+        {loading ? (
+          <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-brand-muted"><Loader2 className="h-4 w-4 animate-spin" />Loading activity…</div>
+        ) : labs.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-brand-muted">
+                <tr><th className="px-4 py-3 font-medium sm:px-5">Lab</th><th className="px-4 py-3 font-medium">Assignments</th><th className="px-4 py-3 font-medium">Submissions</th><th className="px-4 py-3 font-medium">Average score</th><th className="px-4 py-3 font-medium">Status</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {labs.map((lab) => (
+                  <tr key={lab.id}>
+                    <td className="px-4 py-3 font-medium text-navy-900 sm:px-5">{lab.title}</td>
+                    <td className="px-4 py-3 text-slate-600">{lab.assignment_count}</td>
+                    <td className="px-4 py-3 text-slate-600">{lab.submission_count}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatPercent(lab.average_score)}</td>
+                    <td className="px-4 py-3"><Badge variant={lab.submission_count && lab.graded_count === lab.submission_count ? 'success' : 'neutral'} size="sm">{lab.submission_count === 0 ? 'No submissions' : lab.graded_count === lab.submission_count ? 'Reviewed' : 'Needs review'}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-5 py-12 text-center">
+            <BarChart3 className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            <h2 className="font-semibold text-navy-900">No assignment activity yet</h2>
+            <p className="mt-1 text-sm text-brand-muted">Create an assignment for one of your classes to see submissions and grades here.</p>
+          </div>
+        )}
       </Card>
     </div>
   );

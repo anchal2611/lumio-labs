@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import MonacoEditor, { OnMount } from '@monaco-editor/react';
 import type * as monacoType from 'monaco-editor';
 import { Socket } from 'socket.io-client';
-import { Lock, Users, ArrowDown, ShieldAlert, Sparkles } from 'lucide-react';
+import { Lock, Users, ArrowDown, ShieldAlert } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import './collabEditor.css';
 
@@ -731,7 +731,7 @@ export const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-950">
-      {/* Smart Line Lock Status Strip */}
+      {/* Line lock status */}
       <div className="bg-slate-900/90 border-b border-slate-800/80 px-4 py-1.5 flex items-center justify-between text-xs gap-3 shrink-0">
         <div className="flex items-center gap-2 overflow-x-auto py-0.5 scrollbar-none">
           <div className="flex items-center gap-1.5 text-slate-400 shrink-0 font-medium">
@@ -767,21 +767,21 @@ export const CollaborativeEditor: React.FC<CollaborativeEditorProps> = ({
 
         <div className="flex items-center gap-2 text-[11px] text-slate-400 shrink-0">
           <span className="flex items-center gap-1 text-emerald-400">
-            <Sparkles className="w-3 h-3" />
-            <span>Auto-Conflict Prevention Active</span>
+            <Lock className="w-3 h-3" />
+            <span>Line locks enabled</span>
           </span>
         </div>
       </div>
 
-      {/* Auto-Redirection Notification Banner */}
+      {/* Line conflict notification */}
       {redirectBanner && (
         <div className="bg-amber-950/90 border-b border-amber-600/40 text-amber-200 px-4 py-2 text-xs flex items-center justify-between animate-fadeIn z-20">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
               Line <strong className="text-amber-100">{redirectBanner.fromLine}</strong> is currently being edited by{' '}
-              <strong className="text-amber-100">{redirectBanner.ownerName}</strong>. You've been automatically shifted
-              downward to Line <strong className="text-amber-100">{redirectBanner.toLine}</strong>.
+              <strong className="text-amber-100">{redirectBanner.ownerName}</strong> is editing this line. The editor moved you to
+              Line <strong className="text-amber-100">{redirectBanner.toLine}</strong>.
             </span>
           </div>
           <button

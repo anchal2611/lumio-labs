@@ -6,7 +6,6 @@ import {
   HelpCircle,
   Award,
   ChevronRight,
-  Sparkles,
   Info,
   ListOrdered,
 } from 'lucide-react';
@@ -116,7 +115,7 @@ export const GuidedPracticalPanel: React.FC<GuidedPracticalPanelProps> = ({
             {/* Expected Output */}
             <div>
               <h4 className="font-bold text-navy-900 uppercase tracking-wider text-[11px] mb-1.5 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
                 <span>Expected Verification Output</span>
               </h4>
               <pre className="p-3 bg-navy-950 text-emerald-400 font-mono text-[11px] rounded-lg overflow-x-auto whitespace-pre-wrap border border-navy-800">

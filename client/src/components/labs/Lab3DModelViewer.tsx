@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   RotateCcw,
+  RotateCw,
   Maximize2,
   Box,
   Eye,
@@ -13,7 +14,6 @@ import {
   Dna,
   Bot,
   Layers,
-  Sparkles,
   Info,
   Check,
   ChevronDown,
@@ -661,7 +661,7 @@ export const Lab3DModelViewer: React.FC<Lab3DModelViewerProps> = ({
             }`}
             title={autoRotate ? 'Pause Rotation' : 'Auto Rotate'}
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <RotateCw className="w-3.5 h-3.5" />
           </button>
 
           {/* Reset Camera */}

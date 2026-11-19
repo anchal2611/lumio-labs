@@ -11,8 +11,8 @@ interface PublicAuthLayoutProps {
 
 export const PublicAuthLayout: React.FC<PublicAuthLayoutProps> = ({
   children,
-  panelTitle = 'A better place to do the practical work.',
-  panelDescription = 'Bring classes, guided labs, assignments, and collaboration into one connected workspace.',
+  panelTitle = 'Course labs and class work, in one place.',
+  panelDescription = 'Use LUMIO to access classes, complete lab work, and submit assignments.',
 }) => (
   <div className="min-h-screen bg-brand-canvas text-brand-text">
     <header className="border-b border-slate-200/80 bg-white">

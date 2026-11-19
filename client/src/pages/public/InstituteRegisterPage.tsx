@@ -82,7 +82,7 @@ export const InstituteRegisterPage: React.FC = () => {
   };
 
   return (
-    <PublicAuthLayout panelTitle="Bring your institute's lab work together." panelDescription="Set up your campus workspace, connect student email domains, and give faculty a place to publish practicals.">
+    <PublicAuthLayout panelTitle="Set up your institute account." panelDescription="Register your institute, add approved student email domains, and manage faculty access.">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Institute onboarding</p>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-navy-900">Register your institute</h2>

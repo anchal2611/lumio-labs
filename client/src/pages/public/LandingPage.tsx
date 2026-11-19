@@ -2,30 +2,23 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  Binary,
   BookOpenCheck,
   BookOpen,
-  Braces,
   Building2,
   Check,
   Code2,
   Cpu,
   Database,
   FlaskConical,
-  Globe,
   GraduationCap,
   Layers3,
-  Network,
   UsersRound,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardContent } from '../../components/ui/Card';
 import { useAuth } from '../../contexts/AuthContext';
 import { config } from '../../config/env';
-import { MOCK_LABS } from '../../services/mockData';
-import { LabItem } from '../../types/lab';
 import { UserRole } from '../../types/auth';
 
 const dashboardPaths: Record<UserRole, string> = {
@@ -40,75 +33,11 @@ const labBrowsePaths: Record<UserRole, string> = {
   admin: '/admin/labs',
 };
 
-const labIcons: Record<string, LucideIcon> = {
-  Code2,
-  Cpu,
-  Database,
-  Zap,
-  Globe,
-  Binary,
-  Network,
-};
-
-const categoryLabels: Record<LabItem['category'], string> = {
-  programming: 'Programming',
-  database: 'Database',
-  web: 'Web development',
-  iot: 'IoT & circuits',
-  ai: 'Artificial intelligence',
-  core_cs: 'Computer science',
-};
-
 const primaryLinkClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2';
 const secondaryLinkClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-navy-900 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2';
 
-function getLabIcon(lab: LabItem): LucideIcon {
-  return labIcons[lab.iconName] || FlaskConical;
-}
-
-function LabCard({ lab }: { lab: LabItem }) {
-  const Icon = getLabIcon(lab);
-
-  return (
-    <Card className="h-full border-slate-200/80 shadow-subtle">
-      <CardContent className="flex h-full flex-col p-5 sm:p-6">
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-primary">
-            <Icon className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <Badge variant="neutral" size="sm" className="capitalize">
-            {lab.difficulty}
-          </Badge>
-        </div>
-
-        <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">
-          {categoryLabels[lab.category] || lab.category.replace(/_/g, ' ')}
-        </p>
-        <h3 className="mt-1.5 text-base font-bold leading-snug text-navy-900">{lab.name}</h3>
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-brand-muted">{lab.tagline}</p>
-
-        <div className="mt-5 flex flex-wrap gap-1.5" aria-label="Supported languages">
-          {lab.languages.map((language) => (
-            <Badge key={language} variant="info" size="sm" className="uppercase">
-              {language}
-            </Badge>
-          ))}
-        </div>
-
-        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-brand-muted">
-          <span>{lab.experimentCount} practicals</span>
-          <span>{lab.estimatedHours} guided hours</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export const LandingPage: React.FC = () => {
   const { isAuthenticated, role } = useAuth();
-  const allLabs = MOCK_LABS;
-  const featuredLab = allLabs.find((lab) => lab.isPopular) || allLabs[0];
-  const FeaturedIcon = featuredLab ? getLabIcon(featuredLab) : FlaskConical;
   const browsePath = isAuthenticated ? labBrowsePaths[role] : '/student/labs';
 
   return (
@@ -171,16 +100,16 @@ export const LandingPage: React.FC = () => {
               </div>
 
               <h1 className="text-4xl font-extrabold leading-[1.08] tracking-tight text-navy-900 sm:text-5xl lg:text-[3.6rem]">
-                Practical learning,
-                <span className="mt-1 block text-primary">all in one place.</span>
+                Campus labs and
+                <span className="mt-1 block text-primary">classwork, online.</span>
               </h1>
               <p className="mt-6 max-w-xl text-base leading-7 text-brand-muted sm:text-lg sm:leading-8">
-                Run experiments, work through guided practicals, and learn with your class in a shared digital lab space.
+                Faculty publish lab work and assignments. Students complete exercises, run code, and share work with their class.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link to={browsePath} className={primaryLinkClass}>
-                  {isAuthenticated ? 'Browse your labs' : 'Explore the labs'}
+                  {isAuthenticated ? 'Browse your labs' : 'Sign in to view labs'}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 {isAuthenticated ? (
@@ -202,81 +131,46 @@ export const LandingPage: React.FC = () => {
               )}
 
               <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200/80 pt-6 text-sm font-medium text-navy-800">
-                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Guided practicals</span>
-                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Open workspaces</span>
-                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Class collaboration</span>
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Lab exercises</span>
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Code execution</span>
+                <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-teal-600" aria-hidden="true" />Class messaging</span>
               </div>
             </div>
 
-            {featuredLab && (
-              <div className="relative mx-auto w-full max-w-xl lg:ml-auto">
-                <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-blue-100 via-cyan-50 to-teal-100 blur-xl" aria-hidden="true" />
-                <Card className="overflow-hidden rounded-2xl border-slate-200/90 shadow-floating">
-                  <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/90 px-5 py-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
-                        <FeaturedIcon className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-navy-900">Lab workspace</p>
-                        <p className="text-[11px] text-brand-muted">A sample environment</p>
-                      </div>
-                    </div>
-                    <Badge variant="neutral" size="sm">Sample lab</Badge>
-                  </div>
-
-                  <CardContent className="p-5 sm:p-7">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Featured lab</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-tight text-navy-900 sm:text-2xl">{featuredLab.name}</h2>
-                    <p className="mt-2 text-sm leading-6 text-brand-muted">{featuredLab.description}</p>
-
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">Practice modes</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {featuredLab.supportedModes.map((mode) => (
-                            <Badge key={mode} variant="primary" size="sm" className="capitalize">{mode}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">Tools</p>
-                        <p className="mt-2 text-sm font-semibold text-navy-900">{featuredLab.tools.length} built in</p>
-                        <p className="mt-0.5 truncate text-xs text-brand-muted">{featuredLab.tools.slice(0, 2).join(' · ')}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                      <div className="flex items-center gap-4 text-xs text-brand-muted">
-                        <span className="inline-flex items-center gap-1.5"><BookOpenCheck className="h-4 w-4 text-teal-600" aria-hidden="true" />{featuredLab.experimentCount} practicals</span>
-                        <span className="inline-flex items-center gap-1.5"><Braces className="h-4 w-4 text-teal-600" aria-hidden="true" />{featuredLab.languages.join(' / ').toUpperCase()}</span>
-                      </div>
-                      <a href="#labs" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark">
-                        See all labs <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-brand-muted">
-                  <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" />
-                  Lab details are drawn from the platform catalog
+            <div className="mx-auto w-full max-w-xl lg:ml-auto">
+              <Card className="overflow-hidden rounded-2xl border-slate-200/90 shadow-floating">
+                <div className="border-b border-slate-200/80 bg-slate-50/90 px-5 py-4">
+                  <p className="text-sm font-semibold text-navy-900">Available workspace tools</p>
+                  <p className="mt-1 text-xs text-brand-muted">The tools shown to a student depend on their class labs.</p>
                 </div>
-              </div>
-            )}
+                <CardContent className="space-y-3 p-5 sm:p-7">
+                  {[
+                    { icon: Code2, title: 'Code editor', detail: 'Write and run programs in a browser workspace.' },
+                    { icon: Database, title: 'SQL workspace', detail: 'Practice queries against example tables.' },
+                    { icon: Cpu, title: 'Circuit simulator', detail: 'Build a circuit and inspect its output.' },
+                  ].map(({ icon: Icon, title, detail }) => (
+                    <div key={title} className="flex items-start gap-3 rounded-xl border border-slate-200 p-3.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary"><Icon className="h-4 w-4" aria-hidden="true" /></div>
+                      <div><p className="text-sm font-semibold text-navy-900">{title}</p><p className="mt-1 text-xs leading-5 text-brand-muted">{detail}</p></div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </section>
 
         <section id="portals" className="scroll-mt-20 border-y border-slate-200/80 bg-brand-canvas px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto mb-10 max-w-2xl text-center">
-              <Badge variant="primary" size="sm">A quick look inside</Badge>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">One platform, three connected workspaces</h2>
-              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">See the tools each part of your campus uses to keep practical work moving.</p>
+              <Badge variant="primary" size="sm">For each role</Badge>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">Campus tools for students, faculty, and admins</h2>
+              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">Each role has access to its classes, labs, and account tools.</p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <PortalPreview icon={Building2} eyebrow="Institute" title="A clearer campus overview" description="Organize people, classes, lab access, and institute settings from one place." modules={['User directory', 'Institute classes', 'Lab configuration']} action={isAuthenticated && role === 'admin' ? 'Open institute dashboard' : 'Register an institute'} to={isAuthenticated && role === 'admin' ? dashboardPaths.admin : '/institute/register'} />
-              <PortalPreview icon={BookOpen} eyebrow="Faculty" title="Practical work your class can follow" description="Publish lab modules, set assignments, review submissions, and guide students." modules={['My classes', 'Lab modules', 'Assignments & grading']} action={isAuthenticated && role === 'teacher' ? 'Open faculty workspace' : 'Faculty sign in'} to={isAuthenticated && role === 'teacher' ? dashboardPaths.teacher : '/login'} />
-              <PortalPreview icon={GraduationCap} eyebrow="Student" title="A workspace for each practical" description="Open class labs, work through exercises, submit assignments, and collaborate." modules={['My classes', 'Guided labs', 'Assignments & collaboration']} action={isAuthenticated && role === 'student' ? 'Open student workspace' : 'Create student account'} to={isAuthenticated && role === 'student' ? dashboardPaths.student : '/register'} />
+              <PortalPreview icon={Building2} eyebrow="Institute admin" title="Manage institute access" description="Create faculty accounts, classes, and lab access for your institute." modules={['Users', 'Classes', 'Labs']} action={isAuthenticated && role === 'admin' ? 'Open dashboard' : 'Register an institute'} to={isAuthenticated && role === 'admin' ? dashboardPaths.admin : '/institute/register'} />
+              <PortalPreview icon={BookOpen} eyebrow="Faculty" title="Prepare class lab work" description="Publish lab exercises, create assignments, and review submissions." modules={['Classes', 'Lab exercises', 'Submissions']} action={isAuthenticated && role === 'teacher' ? 'Open dashboard' : 'Faculty sign in'} to={isAuthenticated && role === 'teacher' ? dashboardPaths.teacher : '/login'} />
+              <PortalPreview icon={GraduationCap} eyebrow="Student" title="Complete class work" description="Open published labs, run code, and submit assignments." modules={['Classes', 'Labs', 'Assignments']} action={isAuthenticated && role === 'student' ? 'Open dashboard' : 'Create student account'} to={isAuthenticated && role === 'student' ? dashboardPaths.student : '/register'} />
             </div>
           </div>
         </section>
@@ -285,28 +179,27 @@ export const LandingPage: React.FC = () => {
           <div className="mx-auto max-w-7xl">
             <div className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div className="max-w-2xl">
-                <Badge variant="aqua" size="sm">Lab environments</Badge>
-                <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">A workspace for every kind of practical</h2>
+                <Badge variant="aqua" size="sm">Lab tools</Badge>
+                <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">Tools used in class labs</h2>
                 <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">
-                  Browse the environments supported by LUMIO, from programming and databases to circuits and systems.
+                  Faculty can publish exercises that use the code editor, SQL workspace, or circuit simulator.
                 </p>
               </div>
               <Link to={browsePath} className="inline-flex items-center gap-2 self-start text-sm font-semibold text-primary hover:text-primary-dark sm:self-auto">
-                {isAuthenticated ? 'Open your labs' : 'Continue to lab access'}
+                {isAuthenticated ? 'Open your labs' : 'Sign in to view labs'}
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {allLabs.map((lab) => <LabCard key={lab.id} lab={lab} />)}
-              <Link to={browsePath} className="group flex h-full min-h-64 flex-col justify-between rounded-xl border border-dashed border-blue-200 bg-blue-50/70 p-5 transition hover:border-primary hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 sm:p-6">
-                <div>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-white text-primary shadow-subtle"><FlaskConical className="h-5 w-5" aria-hidden="true" /></div>
-                  <h3 className="mt-5 text-base font-bold text-navy-900">Your institute’s labs</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-brand-muted">Open the labs shared with your classes and continue into your workspace.</p>
-                </div>
-                <span className="mt-5 inline-flex items-center gap-2 border-t border-blue-100 pt-4 text-sm font-semibold text-primary group-hover:text-primary-dark">{isAuthenticated ? 'Browse your labs' : 'Sign in to browse'}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
-              </Link>
+              {[
+                { icon: Code2, title: 'Code editor', detail: 'Write and run code for programming exercises.' },
+                { icon: Database, title: 'SQL workspace', detail: 'Run SQL queries against local example tables.' },
+                { icon: Cpu, title: 'Circuit simulator', detail: 'Connect components and inspect simulated output.' },
+                { icon: BookOpenCheck, title: 'Guided exercises', detail: 'Follow instructions and submit your work.' },
+              ].map(({ icon: Icon, title, detail }) => (
+                <Card key={title} className="h-full border-slate-200/80"><CardContent className="p-5 sm:p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-primary"><Icon className="h-5 w-5" aria-hidden="true" /></div><h3 className="mt-4 text-base font-bold text-navy-900">{title}</h3><p className="mt-2 text-sm leading-relaxed text-brand-muted">{detail}</p></CardContent></Card>
+              ))}
             </div>
           </div>
         </section>
@@ -316,13 +209,13 @@ export const LandingPage: React.FC = () => {
             <div className="mx-auto mb-10 max-w-2xl text-center">
               <Badge variant="primary" size="sm">Getting started</Badge>
               <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">From class to practical work</h2>
-              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">Coursework, lab time, and collaboration stay connected in one place.</p>
+              <p className="mt-2 text-sm leading-6 text-brand-muted sm:text-base">Set up an institute, publish class work, and review submissions.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <StepCard number="01" icon={Building2} title="Join your institute" description="Students create an account with their campus email. Faculty and institute admins manage access through their institution." />
-              <StepCard number="02" icon={FlaskConical} title="Open a class lab" description="Choose a published practical, follow its guide, or use the workspace to explore a problem on your own." />
-              <StepCard number="03" icon={UsersRound} title="Work and share" description="Collaborate in real time, submit coursework, and keep feedback connected to the practical." />
+              <StepCard number="01" icon={Building2} title="Set up the institute" description="An admin registers the institute and adds approved student email domains." />
+              <StepCard number="02" icon={FlaskConical} title="Publish class work" description="Faculty create a class, publish labs, and set assignments." />
+              <StepCard number="03" icon={UsersRound} title="Complete assignments" description="Students work through exercises and submit their code for review." />
             </div>
           </div>
         </section>
@@ -333,10 +226,10 @@ export const LandingPage: React.FC = () => {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-cyan-200">
                 <UsersRound className="h-5 w-5" aria-hidden="true" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Built for learning together</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Your lab work has a team around it.</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Class collaboration</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Work with your class.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Pair on code, ask faculty for help, and keep practical work connected to your classes.
+                Share a coding session with classmates or ask your instructor for help.
               </p>
               <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-200">
                 <span className="inline-flex items-center gap-2"><UsersRound className="h-4 w-4 text-cyan-200" aria-hidden="true" />Peer rooms</span>

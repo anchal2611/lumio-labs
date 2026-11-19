@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, BookOpen, Loader2, Sparkles, CheckCircle } from 'lucide-react';
+import { FileText, Plus, BookOpen, Loader2, CheckCircle } from 'lucide-react';
 import { apiGet } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';

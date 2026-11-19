@@ -4,7 +4,6 @@ import {
   Users2,
   BookOpen,
   MessageSquare,
-  Sparkles,
   Save,
   Send,
   Share2,

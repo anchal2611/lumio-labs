@@ -1,79 +1,64 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, BookOpen, Award, Mail, Building2 } from 'lucide-react';
+import { User, Mail, Building2, BriefcaseBusiness } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 
 export const TeacherProfile: React.FC = () => {
   const { user } = useAuth();
+  const designation = user?.profile?.designation || user?.designation;
+  const department = user?.profile?.department || user?.department;
+  const employeeId = user?.profile?.employeeId;
+  const institute = user?.institute?.name || user?.university;
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <User className="w-5 h-5 text-teal-600" />
-          <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">
-            Faculty Profile & Lab Directorate
-          </h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-navy-900 tracking-tight">Faculty profile</h1>
         </div>
-        <p className="text-xs text-brand-muted">
-          Your university academic credentials, office hours, and laboratory supervision records
-        </p>
+        <p className="text-sm text-brand-muted">Account details for your faculty account.</p>
       </div>
 
       <Card className="border border-slate-200/80">
         <CardContent className="p-8">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-6 border-b border-slate-100 text-center sm:text-left">
-            <img
-              src={user?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'}
-              alt={user?.name}
-              className="w-24 h-24 rounded-full object-cover ring-4 ring-teal-500/10 shadow-elevated"
-            />
+            {user?.avatar ? (
+              <img src={user.avatar} alt="" className="h-20 w-20 rounded-full object-cover ring-4 ring-teal-500/10" />
+            ) : (
+              <div aria-hidden="true" className="flex h-20 w-20 items-center justify-center rounded-full bg-teal-50 text-2xl font-semibold text-teal-700 ring-4 ring-teal-500/10">
+                {user?.name?.trim().charAt(0).toUpperCase() || 'F'}
+              </div>
+            )}
             <div className="space-y-1">
               <div className="flex items-center justify-center sm:justify-start gap-2">
-                <h2 className="text-xl font-bold text-navy-900">{user?.name}</h2>
-                <Badge variant="aqua" size="sm">
-                  Verified Faculty Director
-                </Badge>
+                <h2 className="text-xl font-bold text-navy-900">{user?.name || 'Faculty member'}</h2>
               </div>
-              <p className="text-xs text-brand-muted">{user?.designation || 'Associate Professor'}</p>
-              <p className="text-xs text-slate-600 font-medium">{user?.department}</p>
+              {designation && <p className="text-sm text-brand-muted">{designation}</p>}
+              {department && <p className="text-sm font-medium text-slate-600">{department}</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 text-xs">
-            <div className="space-y-4">
-              <div>
-                <span className="text-slate-400 block mb-0.5">University:</span>
-                <span className="font-semibold text-navy-900">{user?.university}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Faculty Email:</span>
-                <span className="font-mono text-navy-900">{user?.email}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Office Hours:</span>
-                <span className="font-semibold text-navy-900">Tuesdays & Thursdays, 2:00 PM – 4:30 PM</span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <span className="text-slate-400 block mb-0.5">Lab Station Supervisions:</span>
-                <span className="font-semibold text-navy-900">C/C++ Low-Level Systems, Relational DBMS</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Department:</span>
-                <span className="font-semibold text-navy-900">{user?.department}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block mb-0.5">Digital Signatures:</span>
-                <span className="font-semibold text-emerald-600">Verified GPG Key Enrolled</span>
-              </div>
-            </div>
-          </div>
+          <dl className="grid grid-cols-1 gap-5 pt-6 text-sm sm:grid-cols-2">
+            <ProfileField icon={Mail} label="Email" value={user?.email} />
+            <ProfileField icon={Building2} label="Institute" value={institute} />
+            <ProfileField icon={BriefcaseBusiness} label="Department" value={department} />
+            <ProfileField icon={User} label="Employee ID" value={employeeId} />
+          </dl>
         </CardContent>
       </Card>
     </div>
   );
 };
+
+function ProfileField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | null }) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+      <div className="min-w-0">
+        <dt className="text-xs text-slate-500">{label}</dt>
+        <dd className="mt-1 break-words font-medium text-navy-900">{value || 'Not provided'}</dd>
+      </div>
+    </div>
+  );
+}

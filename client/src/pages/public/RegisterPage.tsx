@@ -83,7 +83,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <PublicAuthLayout panelTitle="Start learning by doing." panelDescription="Join your campus labs, work through practicals, and keep your progress connected to class.">
+    <PublicAuthLayout panelTitle="Create a student account." panelDescription="Use your campus email to join classes and access published labs.">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Student access</p>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-navy-900">Create your account</h2>

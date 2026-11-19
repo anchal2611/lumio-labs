@@ -7,7 +7,6 @@ import {
   Users2,
   Plus,
   MessageSquare,
-  Sparkles,
   HelpCircle,
   FileCode,
   ShieldCheck,

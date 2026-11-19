@@ -26,6 +26,7 @@ import { hasFirebaseAdminCredentials } from '../config/firebaseAdmin';
 import { config, isPublicJudge0Endpoint } from '../config/env';
 import { listAuditLogs, listNotifications, markAllNotificationsRead, markNotificationRead } from '../controllers/activityController';
 import { getConversationMessages, listConversations, listMessageContacts, sendMessage } from '../controllers/messageController';
+import { getTeacherAnalytics } from '../controllers/teacherAnalyticsController';
 import { createResource, deleteResource, listResources } from '../controllers/resourceController';
 import { getDatabasePersistenceStatus } from '../db/database';
 
@@ -70,6 +71,7 @@ apiRouter.get('/admin/students', verifyToken, requireRole(['admin']), getStudent
 apiRouter.patch('/admin/users/:id/status', verifyToken, requireRole(['admin']), updateUserStatus as any);
 apiRouter.get('/admin/stats', verifyToken, requireRole(['admin']), getStats as any);
 apiRouter.get('/admin/audit-logs', verifyToken, requireRole(['admin']), listAuditLogs as any);
+apiRouter.get('/teacher/analytics', verifyToken, requireRole(['teacher']), getTeacherAnalytics as any);
 
 // Messaging & notifications
 apiRouter.get('/messages/contacts', verifyToken, listMessageContacts as any);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Terminal, Copy, Trash2, Cpu, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Terminal, Copy, Trash2, Cpu, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 interface TerminalPanelProps {
@@ -20,8 +20,8 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   onClear,
   stdin,
   onStdinChange,
-  executionTimeMs = 24,
-  memoryKb = 4120,
+  executionTimeMs,
+  memoryKb,
 }) => {
   const [activeTab, setActiveTab] = useState<'output' | 'stdin'>('output');
   const [copied, setCopied] = useState(false);
@@ -69,18 +69,18 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         <div className="flex items-center gap-3">
           {hasContent && (
             <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-              <span className="flex items-center gap-1">
+              {executionTimeMs !== undefined && <span className="flex items-center gap-1">
                 <Cpu className="w-3 h-3 text-slate-500" />
                 {executionTimeMs}ms
-              </span>
-              <span>{Math.round(memoryKb / 1024)}MB RAM</span>
+              </span>}
+              {memoryKb !== undefined && <span>{Math.round(memoryKb / 1024)}MB RAM</span>}
               {stderr ? (
                 <span className="flex items-center gap-1 text-red-400 font-semibold">
                   <AlertCircle className="w-3 h-3" /> Error
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                  <CheckCircle2 className="w-3 h-3" /> Code 0
+                  <CheckCircle2 className="w-3 h-3" /> Completed
                 </span>
               )}
             </div>
@@ -114,7 +114,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             {isExecuting ? (
               <div className="flex items-center gap-2.5 text-brand-aqua py-3">
                 <div className="w-3 h-3 rounded-full border-2 border-brand-aqua border-t-transparent animate-spin" />
-                <span>Compiling and executing in isolated LUMIO sandbox...</span>
+                <span>Running code…</span>
               </div>
             ) : stdout || stderr ? (
               <div className="space-y-1">
@@ -128,10 +128,6 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                     {stderr}
                   </pre>
                 )}
-                <div className="pt-2 text-[10px] text-slate-500 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-brand-aqua" />
-                  <span>Execution verified by LUMIO Virtual Execution Engine</span>
-                </div>
               </div>
             ) : (
               <div className="text-slate-500 italic py-2">

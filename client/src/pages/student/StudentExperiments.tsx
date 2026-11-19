@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLabStore } from '../../store/useLabStore';
-import { FileCode2, Play, Download, Trash2, Clock, Sparkles } from 'lucide-react';
+import { FileCode2, Play, Download, Clock } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -38,12 +38,10 @@ export const StudentExperiments: React.FC = () => {
             My Saved Experiments
           </h1>
         </div>
-        <p className="text-xs text-brand-muted">
-          Your personal academic code portfolio with execution snapshots and benchmarks
-        </p>
+        <p className="text-sm text-brand-muted">Saved code from your lab sessions.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {savedExperiments.length ? <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {savedExperiments.map((exp) => (
           <Card key={exp.id} className="border border-slate-200/80">
             <CardContent className="p-5 flex flex-col justify-between h-full">
@@ -95,7 +93,7 @@ export const StudentExperiments: React.FC = () => {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </div> : <Card><CardContent className="px-6 py-14 text-center"><FileCode2 className="mx-auto mb-3 h-9 w-9 text-slate-300" /><h2 className="font-semibold text-navy-900">No saved experiments</h2><p className="mt-1 text-sm text-brand-muted">Saved experiments will appear here.</p></CardContent></Card>}
     </div>
   );
 };

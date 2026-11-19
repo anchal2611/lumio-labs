@@ -12,7 +12,6 @@ import {
   Moon,
   Sun,
   Maximize2,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
